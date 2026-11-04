@@ -1,0 +1,16 @@
+{
+  "name": "AntibodyID Pro: Schneck Edition",
+  "short_name": "AntibodyID Pro",
+  "description": "Antibody identification worksheet for Grifols panels with Schneck Medical Center rule-out rules.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B2545",
+  "theme_color": "#0B2545",
+  "lang": "en",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
