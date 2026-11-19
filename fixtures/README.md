@@ -1,3 +1,3 @@
-# Canvas source fixture
+# Canvas source fixtures
 
-`canvas-source.tsx` is the AntibodyID Pro canvas program with the upload wrapper removed. `scripts/verify-counts.mjs` fails if `src/App.tsx` drifts from this file, other than the import lines that point at the local React components.
+`pro-canvas-source.tsx` and `bells-canvas-source.tsx` are the canvas programs with the upload wrapper removed. `scripts/verify-counts.mjs` fails if `src/ProApp.tsx` or `src/BellsApp.tsx` drifts from its fixture, other than the import lines that point at the local React components.

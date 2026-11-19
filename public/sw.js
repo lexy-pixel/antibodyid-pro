@@ -1,4 +1,4 @@
-const CACHE = "antibodyid-pro-v1";
+const CACHE = "antibodyid-pro-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
