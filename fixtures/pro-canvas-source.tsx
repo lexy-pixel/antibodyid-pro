@@ -1,15 +1,16 @@
-import { Page, Section, Text, Callout, Select, Toggle, Button, Table, Rows, Segmented, Status, Input, useGrokTheme } from "./canvas";
-import { useState, useMemo, useEffect, Fragment, type CSSProperties } from "react";
+import { Page, Section, Text, Callout, Select, Toggle, Button, Table, Rows, Segmented, Status, Input, useGrokTheme, useState, useMemo, useEffect, Fragment } from "grok/canvas";
+import type { CSSProperties } from "grok/canvas";
 
 const AG: string[] = ["D","C","E","c","e","Cw","K","k","Kpa","Fya","Fyb","Jka","Jkb","M","N","S","s","Lea","Leb","P1","Lua","Xga"];
 const LABEL: Record<string,string> = { D:"D",C:"C",E:"E",c:"c",e:"e",Cw:"Cʷ",K:"K",k:"k",Kpa:"Kpᵃ",Fya:"Fyᵃ",Fyb:"Fyᵇ",Jka:"Jkᵃ",Jkb:"Jkᵇ",M:"M",N:"N",S:"S",s:"s",Lea:"Leᵃ",Leb:"Leᵇ",P1:"P₁",Lua:"Luᵃ",Xga:"Xgᵃ" };
 const PARTNER: Record<string,string> = { C:"c",c:"C",E:"e",e:"E",Fya:"Fyb",Fyb:"Fya",Jka:"Jkb",Jkb:"Jka",M:"N",N:"M",S:"s",s:"S" };
-// Schneck Medical Center blood bank SOP, Ab ID Helpful Hints.
-const SCHNECK_SINGLE: string[] = ["D", "f", "K", "P1", "Xga"];
-const SCHNECK_LFA: string[] = ["V", "Cw", "Kpa", "Jsa", "Lua"];
+// Schneck Medical Center Blood Bank Tech Guide: Antibody Identification (11/2026), section 2 "Antigen Exclusion (Rule-Out) Criteria (Only one needed)".
+const SCHNECK_DOUBLE: string[] = ["C", "c", "E", "e", "Fya", "Fyb", "Jka", "Jkb", "M", "N", "S", "s"]; // Double-Dose Required
+const SCHNECK_SINGLE: string[] = ["D", "K", "P1", "Xga", "Lea", "Leb", "Lua", "Lub"]; // Single-Dose Permitted
+const SCHNECK_LFA: string[] = ["V", "Cw", "Kpa", "Jsa", "Lua"]; // may be omitted during the initial exclusion process
+// Antigram antigens the guide does not list: k = double dose (K-k+ cell, K is on the antigram); Cw and Kpa = no partner on the antigram, any antigen-positive cell (also LFA).
 const SCHNECK_PARTNER: Record<string, string> = { ...PARTNER, k: "K" };
-const SCH_DOUBLE_N = 2; // "Only 2 needed"
-const SCH_HET_N = 3; // "minimum of 3 Single Dose"
+const SCH_N = 1; // "Only one needed"
 
 interface Lot { lot: string; exp: string; donors: string[]; rh: string[]; cells: string[]; other: string[]; brand?: string; product?: string; }
 const LOTS: Lot[] = [
@@ -206,7 +207,7 @@ const DOSE_SRC: string[] = [
   "G: ARUP Laboratories, Introduction to Antibody Identification lecture slides, arup.utah.edu",
 ];
 const DOSE_COL: Record<string, string> = { "Yes": "#0b8a45", "Variable": "#d98a00", "No": "#6b7280", "Not verified": "#9ca3af" };
-// Schneck Medical Center blood bank SOP, Ab ID Helpful Hints (transcribed from the sheet).
+// Schneck Medical Center blood bank SOP, Ab ID Helpful Hints (transcribed from the sheet). Superseded by the 11/2026 Tech Guide; kept for reference.
 const SCH_HINTS: [string, string][] = [
   ["Double dose only", "Use ONLY DOUBLE DOSE (homozygous +/-) expressions to Rule Out Ab. Only 2 needed. Example: C+,c-"],
   ["Single-dose exceptions", "Exceptions when CAN use SINGLE DOSE (heterozygous +/+) expressions: For D, f, K, P1, Xga"],
@@ -216,6 +217,280 @@ const SCH_HINTS: [string, string][] = [
   ["Validation", "Must have a minimum of 2 positives and 3 Negatives to validate an antibody"],
   ["Final check", "Once finished with Ab ID, ALWAYS go back and make sure that ALL positive patient results are accounted for. (If do have extra positives, will need to go back and make sure not missing another antibody; like a LFA.)"],
 ];
+
+// Schneck Blood Bank Tech Guide: Antibody Identification (11/2026), transcribed as written.
+const TG1: [string, string][] = [
+  [`Review Patient History`, `Verify transfusion and pregnancy history (past 3 months), diagnosis, and past Ab/phenotype records.`],
+  [`Evaluate Autocontrol / DAT: Negative`, `Suggests alloantibody.`],
+  [`Evaluate Autocontrol / DAT: Positive`, `Indicates possible autoantibody, drug-induced reactivity, or alloantibody on recently transfused donor cells. Perform DAT.`],
+];
+const TG2: [string, string][] = [
+  [`Double-Dose Required (For systems with dosage)`, `Rh: C (C+c-), c (C-c+), E (E+e-), e (E-e+) · Duffy: Fyᵃ (Fy(a+b-)), Fyᵇ (Fy(a-b+)) · Kidd: Jkᵃ (Jk(a+b-)), Jkᵇ (Jk(a-b+)) · MNS: M (M+N-), N (M-N+), S (S+s-), s (S-s+)`],
+  [`Single-Dose Permitted`, `D, K, P1, Xgᵃ, Leᵃ, Leᵇ, Luᵃ, Luᵇ. Exception: If Anti-D is present, you may use single-dose C (D- C+ c+) and E (D- E+ e+) to rule out C and E.`],
+];
+const TG3: [string, string][] = [
+  [`Standard "Rule of Three" (p ≤ 0.05)`, `Must have a minimum of 3 antigen-positive reactive cells AND 3 antigen-negative non-reactive cells matching the pattern.`],
+  [`"Rule of Two" Exception`, `Minimum of 2 positive/2 negative cells permitted ONLY for low-frequency antibodies (e.g., Cʷ, Kpᵃ) or when using selected cells for complex multi-antibody cases per medical director validation.`],
+  [`Account for ALL Reactivity`, `Ensure 100% of positive reactions are explained. If extra positives exist, check for additional antibodies (including LFAs), antibodies to high-prevalence antigens, or dosage effects.`],
+];
+const TG4: [string, string][] = [
+  [`Requirement`, `Patient must type antigen-negative for the suspected corresponding antibody.`],
+  [`STOP — Do NOT perform routine serologic phenotyping if:`, `The patient was transfused in the last 3 months (risk of mixed-field reactions). · The patient has a positive IgG DAT (risk of false-positive reactions at the IAT phase).`],
+  [`Action`, `In these cases, utilize molecular RBC genotyping or historical pre-transfusion records.`],
+];
+const TG_APPLY = `How this Page applies it (Schneck rules on): 1 nonreactive cell (0 in every phase entered) crosses out an antigen. Double-dose antigens (C, c, E, e, Fyᵃ, Fyᵇ, Jkᵃ, Jkᵇ, M, N, S, s) need a homozygous cell; single-dose (heterozygous) cells do not count for them. Single-dose antigens (D, K, P₁, Xgᵃ, Leᵃ, Leᵇ, Luᵃ) use any antigen-positive cell. Antigram antigens the guide does not list: k is treated as double dose (1 K−k+ cell), because its partner K is on the antigram; Cʷ and Kpᵃ have no partner on the antigram, so 1 antigen-positive cell, and they are tagged as low-frequency. Luᵇ, V, Jsᵃ and f are not antigram columns. Anti-D detected on: 1 nonreactive D− C+c+ cell rules out C and 1 nonreactive D− E+e+ cell rules out E. Confirmation defaults to the Rule of Three (3+/3−); the Rule of Two option allows 2+/2−.`;
+// Blood Type Compatibility Chart (posted chart, Schneck blood bank). [recipient, red cells, whole blood, plasma]
+const COMPAT: [string, string, string, string][] = [
+  [`O +`, `O +; O -`, `O +; O -`, `any O; A; B or AB`],
+  [`O -`, `O -`, `O -`, `any O; A; B or AB`],
+  [`A +`, `any A +; A -; O + or O -`, `any A + or A -`, `any A or AB`],
+  [`A -`, `any A - or O -`, `A -`, `any A or AB`],
+  [`B +`, `any B +; B -; O + or O -`, `any B + or B -`, `any B or AB`],
+  [`B -`, `any B - or O -`, `B -`, `any B or AB`],
+  [`AB +`, `any AB +; AB -; A +; A -; B +; B -; O +; or O-`, `any AB + or AB -`, `any AB`],
+  [`AB -`, `any AB -; A -; B -, or O -`, `AB -`, `AB`],
+];
+const SELC: [string, string][] = [
+  [`Whole Blood`, `Must be identical to that of the recipient.* NA special order`],
+  [`Leukoreduced Red Blood Cells`, `Must be compatible with the recipient's plasma.`],
+  [`Granulocytes Pheresis`, `Must be compatible with the recipient's plasma. NA special order`],
+  [`Fresh Frozen Plasma`, `Should be compatible with the recipient's red cells.`],
+  [`Platelets Pheresis`, `All ABO groups acceptable; components compatible with the recipient's red cells preferred`],
+  [`Cryoprecipitated AHF`, `All ABO groups Acceptable*`],
+];
+// Ortho-Clinical Diagnostics Antibody Index Chart (2002). Row: [antibody, ISBT, dots RT|37|AHG|gel RT|gel 37|IgG card 37 (1 = dot), natural, immune, transfusion reaction, HDN, enzyme, % compatible Caucasians, % compatible African-Americans, remarks]. "^" = the remark in the row above continues over this row.
+type OR = [string, string, string, string, string, string, string, string, string, string, string];
+const ORTHO: [string, OR[]][] = [
+  [`Rh-hr`, [
+    [`D`, `RH1`, `011011`, `Unlikely`, `Yes`, `Probable`, `Common`, `Increased`, `15`, `8`, `May occur with Anti-C.`],
+    [`C`, `RH2`, `011011`, `Unlikely`, `Yes`, `Probable`, `May`, `Increased`, `32`, `73`, `Often found with other antibodies, especially Anit-D or Anti-G.`],
+    [`E`, `RH3`, `011011`, `Occasionally`, `Yes`, `Probable`, `May`, `Increased`, `71`, `78`, `Occurs frequently with Anti-c. May be naturally occuring.`],
+    [`c`, `RH4`, `011011`, `Unlikely`, `Yes`, `Probable`, `Common`, `Increased`, `20`, `4`, ``],
+    [`e`, `RH5`, `011011`, `Unlikely`, `Yes`, `Probable`, `May`, `Increased`, `2`, `2`, ``],
+    [`f`, `RH6`, `011011`, `Unlikely`, `Yes`, `Probable`, `May`, `Increased`, `35`, `8`, `Only reacts with compound antigen, ce.`],
+    [`Cʷ`, `RH8`, `011011`, `Occasionally`, `Yes`, `Probable`, `May`, `Increased`, `98`, `99`, `May be naturally occuring.`],
+    [`V`, `RH10`, `011011`, `Unlikely`, `Yes`, `Probable`, `No Reports`, `Increased`, `99`, `70`, `Often found with other antibodies, especially Anti-D.`],
+  ]],
+  [`Kell`, [
+    [`K`, `KEL1`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Same`, `91`, `98`, `Expression of K can be acquired as a result of bacterial activity in vivo and in vitro.`],
+    [`k`, `KEL2`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Same`, `0.2`, `<0.1`, ``],
+    [`Kpᵃ`, `KEL3`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Same`, `98`, `>99`, `Kpᵃ may have a supressing effect on other inherited Kell system antigens.`],
+    [`Kpᵇ`, `KEL4`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Same`, `<0.1`, `<0.1`, `Sera containing Anti-Kpᵇ often contain Anti-K.`],
+    [`Jsᵃ`, `KEL6`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Same`, `>99`, `80`, ``],
+    [`Jsᵇ`, `KEL7`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Same`, `<0.1`, `1`, ``],
+  ]],
+  [`Duffy`, [
+    [`Fyᵃ`, `FY1`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Decreased`, `34`, `90`, `Fyᵃ has been demonstrated on fetal RBCs as early as 6 weeks gestation.`],
+    [`Fyᵇ`, `FY2`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Decreased`, `17`, `77`, ``],
+  ]],
+  [`Kidd`, [
+    [`Jkᵃ`, `JK1`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Increased`, `23`, `8`, `May exhibit dosage. Anti-Jkᵃ fades in vitro and in vivo.`],
+    [`Jkᵇ`, `JK2`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Increased`, `26`, `51`, `Anti-Jkᵇ fades in vitro and in vivo. May cause a severe hemolytic reaction.`],
+  ]],
+  [`Lewis`, [
+    [`Leᵃ`, `LE1`, `111100`, `Yes`, `Unlikely`, `May`, `Unlikely`, `Increased`, `78`, `77`, `Frequently occurs in the serum of pregnant women. Anti-Leᵃ and Anti-Leᵇ are often found together and are most common in people with Le(a-b-) red cells.`],
+    [`Leᵇ`, `LE2`, `111100`, `Yes`, `Unlikely`, `Unlikely`, `Unlikely`, `Increased`, `28`, `45`, `^`],
+  ]],
+  [`MNS`, [
+    [`S`, `MNS3`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Variable`, `45`, `69`, `S antigen is sensitive to trace amounts of chlorine.`],
+    [`s`, `MNS4`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Variable`, `11`, `7`, `A pH of 6.0 enhances the reactivity of some Anti-s.`],
+    [`M`, `MNS1`, `110111`, `Yes`, `Unlikely`, `Unlikely`, `Unlikely`, `Decreased`, `22`, `26`, `Antibody often exhibits dosage. Can be pH dependant.`],
+    [`N`, `MNS2`, `110100`, `Yes`, `Unlikely`, `Unlikely`, `Unlikely`, `Decreased`, `28`, `25`, `Formaldehyde induced Anti-N can be found in dialysis patients.`],
+    [`U`, `MNS5`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Same`, `<0.1`, `1`, `Most U negative cells are S- s-.`],
+  ]],
+  [`P`, [
+    [`P₁`, `P1`, `110100`, `Yes`, `Unlikely`, `Unlikely`, `Unlikely`, `Increased`, `21`, `6`, `Antigen strength is variable. Anti-P1 is frequently present in serum of patients with Hydatid disease, liver flukes, acute hepatic fascioliasis.`],
+  ]],
+  [`Globoside`, [
+    [`P`, `GLOB1`, `111111`, `Yes`, `Unlikely`, `Probable`, `No Reports`, `Increased`, `<0.1`, `<0.1`, `Associated with Paroxysmal Cold Hemoglobinuria (PCH).`],
+    [`P+P₁+Pᵏ`, `GLOB1/P1/GLOB2`, `111111`, `Yes`, `Unlikely`, `Probable`, `May`, `Increased`, `<0.1`, `<0.1`, `Alloantibody in the sera of p-persons. May cause complete hemolysis in fresh serum. Associated with higher than normal rates of spontaneous abortions.`],
+  ]],
+  [`Lutheran`, [
+    [`Luᵃ`, `LU1`, `110000`, `Yes`, `Yes`, `Unlikely`, `Unlikely`, `Variable`, `92`, `95`, `Sera containing Anti-Luᵃ often also contains HLA antibodies.`],
+    [`Luᵇ`, `LU2`, `001001`, `Unlikely`, `Yes`, `Probable`, `May`, `Variable`, `<0.2`, `<0.2`, ``],
+  ]],
+  [`HTLA`, [
+    [`Ykᵃ`, `KN5`, `001000`, `Unlikely`, `Yes`, `Unlikely`, `Unlikely`, `Decreased`, `8`, `2`, `Antigens can vary in strength. The antibodies can be difficult to dectect due to characteristically weak reactions in the antiglobulin test. This can lead to variable results in tests on different samples from the same patient.`],
+    [`Knᵃ`, `KN1`, `001000`, `Unlikely`, `Yes`, `Unlikely`, `Unlikely`, `Same`, `1`, `1`, `^`],
+    [`Csᵃ`, `COST1`, `001000`, `Unlikely`, `Yes`, `Unlikely`, `Unlikely`, `Same`, `2`, `1`, `^`],
+    [`Chᵃ`, `CH/RG1`, `001000`, `Unlikely`, `Yes`, `Unlikely`, `Unlikely`, `Decreased`, `4`, `4`, `^`],
+    [`Rgᵃ`, `CH/RG11`, `001000`, `Unlikely`, `Yes`, `Unlikely`, `Unlikely`, `Decreased`, `2`, `2`, `^`],
+    [`JMH`, `JMH`, `001000`, `Unlikely`, `Yes`, `Unlikely`, `Unlikely`, `Decreased`, `4`, `4`, `^`],
+    [`McCᵃ`, `KN3`, `001000`, `Unlikely`, `Yes`, `Unlikely`, `Unlikely`, `Same`, `2`, `6`, `^`],
+  ]],
+];
+const OR_DOT: string[] = ["#1d3f73", "#2a86c4", "#e0607e", "#1d3f73", "#2a86c4", "#e0607e"];
+const OR_PH: string[] = ["RT", "37°C", "AHG", "Buffered Gel Card RT", "Buffered Gel Card 37°C", "IgG Card 37°C"];
+const spanOf = (rows: string[][], j: number, col: number): number => { let n = 1; while (j + n < rows.length && rows[j + n][col] === "^") n++; return n; };
+// Grifols "Human Blood Group Antigens & Antibodies" poster, right half (left half in GRIF_L below). Grouped by Gene(s). Row: [ISBT symbol, Caucasian, Black, Asian, antigen density, Ig class, 4°C-RT, IAT, Papain/Ficin, DTT 0.2M, HTR, HDFN]. "·" = dot printed on the poster.
+type GR = [string, string, string, string, string, string, string, string, string, string, string, string];
+const GRIF: [string, GR[]][] = [
+  [`ABO`, [
+    [`ABO1`, `43`, `27`, `28`, `Variable`, `IgM; (IgG)`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `No-Severe`, `No-Moderate`],
+    [`ABO2`, `9`, `20`, `27`, `Variable`, `IgM; (IgG)`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `No-Severe`, `No-Moderate`],
+    [`ABO3`, `56`, `51`, `57`, `Variable`, `IgM; (IgG)`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `No-Mild`, `No-Moderate`],
+    [`ABO4`, `34`, `19`, `27`, `Variable`, `IgM; (IgG)`, `Yes`, `Rarely`, `Enhanced`, `Resistant`, `No-Mild`, `No`],
+  ]],
+  [`GYPA`, [
+    [`MNS1`, `78`, `74`, `·`, `Dosage`, `IgG (cold); IgM`, `Yes`, `Rarely`, `Sensitive*`, `Resistant`, `Rare`, `Rare`],
+    [`MNS2`, `72`, `75`, `·`, `Dosage`, `IgG (cold); IgM`, `Yes`, `Rarely`, `Sensitive*`, `Resistant`, `Rare`, `No`],
+  ]],
+  [`GYPB`, [
+    [`MNS3`, `55`, `31`, `·`, `Dosage`, `IgG; IgM`, `Yes`, `Yes`, `Variable**`, `Resistant`, `No-Mod.(Rare)`, `No-Mod.(Rare)`],
+    [`MNS4`, `89`, `93`, `·`, `Dosage`, `IgG; IgM`, `Yes`, `Yes`, `Variable**`, `Resistant`, `No-Mild(Rare)`, `No-Severe(Rare)`],
+    [`MNS5`, `99,9`, `99`, `·`, `·`, `IgG`, `·`, `Yes`, `Resistant`, `Resistant`, `Mild-Severe`, `Mild-Severe`],
+  ]],
+  [`GYPA-B (Hybrid)`, [
+    [`MNS7`, `<0.01`, `<0.01`, `~15`, `·`, `IgM; IgG`, `Yes`, `Yes`, `Sensitive`, `Resistant`, `Rare`, `Mild-Severe`],
+    [`MNS10`, `<0.01`, `<0.01`, `6-9`, `·`, `IgG; (IgM)`, `Yes`, `Yes`, `Sensitive`, `Resistant`, `No-Severe`, `No-Severe`],
+  ]],
+  [`A4GALT`, [
+    [`P1PK1`, `79`, `94`, `20-30`, `Variable`, `IgM; (IgG)`, `Yes`, `Rarely`, `Enhanced`, `Resistant`, `No-Moderate`, `No`],
+    [`P1PK3`, `100`, `100`, `100`, `Variable`, `IgM; IgG`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `No-Severe`, `No-Severe`],
+  ]],
+  [`RHD`, [
+    [`RH1`, `85`, `92`, `99`, `Variable`, `IgG; (IgM)`, `Rarely`, `Yes`, `Enhanced`, `Resistant`, `Mild-Severe`, `Mild-Severe`],
+  ]],
+  [`RHCE`, [
+    [`RH2`, `68`, `27`, `93`, `Dosage`, `IgG; IgM`, `Rarely`, `Yes`, `Enhanced`, `Resistant`, `Mild-Severe`, `Mild-Severe`],
+    [`RH3`, `29`, `22`, `39`, `Dosage`, `IgG; IgM`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `Mild-Moderate`, `Mild`],
+    [`RH4`, `80`, `98`, `47`, `Dosage`, `IgG; (IgM)`, `Rarely`, `Yes`, `Enhanced`, `Resistant`, `Mild-Severe`, `Mild-Severe`],
+    [`RH5`, `98`, `98`, `96`, `Dosage`, `IgG; (IgM)`, `Rarely`, `Yes`, `Enhanced`, `Resistant`, `Mild-Moderate`, `Rare(Mild)`],
+    [`RH6`, `65`, `92`, `12`, `·`, `IgG; (IgM)`, `Yes`, `Yes`, `Resistant`, `Resistant`, `Mild`, `Mild`],
+    [`RH7`, `68`, `27`, `92`, `·`, `IgG; (IgM)`, `Rarely`, `Yes`, `Enhanced`, `Resistant`, `Mild`, `Mild`],
+    [`RH8`, `2`, `1`, `·`, `·`, `IgG; IgM`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `Mild-Severe`, `Mild-Moderate`],
+    [`RH10`, `1`, `30`, `·`, `·`, `IgG`, `·`, `Yes`, `Resistant`, `Resistant`, `Mild`, `No`],
+    [`RH12`, `84`, `92`, `100`, `·`, `IgG`, `·`, `Yes`, `Enhanced`, `Resistant`, `No-Severe`, `No-Severe`],
+    [`RH19`, `98`, `97`, `98`, `·`, `IgG`, `·`, `Yes`, `Enhanced`, `Resistant`, `No-Fatal`, `No Evidence`],
+    [`RH20`, `<0.01`, `26-40`, `<0.01`, `·`, `IgG`, `·`, `Yes`, `Enhanced`, `Resistant`, `Mild`, `No/+DAT`],
+    [`RH31`, `98`, `97`, `96`, `·`, `IgG`, `·`, `Yes`, `Enhanced`, `Resistant`, `No`, `No/+DAT`],
+  ]],
+  [`LU, BCAM`, [
+    [`LU1`, `8`, `5`, `·`, `Variable`, `IgM; IgG`, `Yes`, `Yes`, `Resistant`, `Sensitive`, `No`, `No-Mild (Rare)`],
+    [`LU2`, `99.8`, `99,8`, `99,8`, `Variable`, `IgG; IgM`, `Yes`, `Yes`, `Resistant`, `Sensitive`, `Mild-Moderate`, `Mild`],
+    [`LU3`, `>99`, `>99`, `>99`, `·`, `IgG`, `Yes`, `Yes`, `Resistant`, `Sensitive`, `No Data`, `No Data`],
+  ]],
+  [`KEL`, [
+    [`KEL1`, `9`, `2`, `Rare`, `·`, `IgG; (IgM)`, `Rarely`, `Yes`, `Resistant††`, `Sensitive`, `Mild-Severe`, `Mild-Severe`],
+    [`KEL2`, `98.8`, `100`, `·`, `·`, `IgG; (IgM)`, `·`, `Yes`, `Resistant††`, `Sensitive`, `Mild-Moderate`, `Mild-Severe`],
+    [`KEL3`, `2`, `<0.01`, `·`, `·`, `IgG; (IgM)`, `·`, `Yes`, `Resistant††`, `Sensitive`, `Mild-Moderate`, `Mild-Severe`],
+    [`KEL4`, `99.9`, `100`, `100`, `·`, `IgG; (IgM)`, `·`, `Yes`, `Resistant††`, `Sensitive`, `No-Moderate`, `Mild-Moderate`],
+    [`KEL6`, `<0.01`, `20`, `·`, `·`, `IgG; (IgM)`, `·`, `Yes`, `Resistant††`, `Sensitive`, `No-Moderate`, `Mild-Severe`],
+    [`KEL7`, `>99`, `99`, `·`, `·`, `IgG`, `·`, `Yes`, `Resistant††`, `Sensitive`, `Mild-Moderate`, `Mild-Severe`],
+  ]],
+  [`FUT3`, [
+    [`LE1`, `22`, `23`, `·`, `Variable`, `IgM; (IgG)`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `No/Rare Hemolytic`, `No-Mild`],
+    [`LE2`, `72`, `55`, `·`, `Variable`, `IgM; (IgG)`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `No`, `No-Mild`],
+  ]],
+  [`FY, DARC`, [
+    [`FY1`, `66`, `10`, `99`, `Dosage`, `IgG; (IgM)`, `·`, `Yes`, `Sensitive***`, `Resistant`, `Mild-Severe/Delayed`, `Mild-Moderate`],
+    [`FY2`, `83`, `23`, `18.5`, `Dosage`, `IgG; (IgM)`, `·`, `Yes`, `Sensitive***`, `Resistant`, `Mild-Severe/Delayed`, `Mild`],
+    [`FY3`, `>99.9`, `32`, `99.9`, `·`, `IgG`, `·`, `Yes`, `Resistant`, `Resistant`, `Mild-Mod./Delayed`, `Mild`],
+  ]],
+  [`JK, SLC14A1`, [
+    [`JK1`, `77`, `92`, `72`, `Dosage`, `IgG; IgGM;IgG+IgM`, `·`, `Yes`, `Enhanced`, `Resistant`, `No-Severe/Delayed`, `Mild-Moderate`],
+    [`JK2`, `74`, `49`, `76`, `Dosage`, `IgG; IgG+IgM; IgM`, `·`, `Yes`, `Enhanced`, `Resistant`, `No-Severe/Delayed`, `No-Mild`],
+    [`JK3`, `100`, `·`, `·`, `·`, `IgG; (IgM)`, `·`, `Yes`, `Enhanced`, `Resistant`, `No-Severe/Delayed`, `No-Mild`],
+  ]],
+  [`DI, SLC4A1`, [
+    [`DI1`, `0,01`, `0,01`, `·`, `Dosage`, `IgG`, `·`, `Yes`, `Resistant`, `Resistant`, `No-Severe`, `Mild-Severe`],
+    [`DI2`, `100`, `·`, `·`, `Dosage`, `IgG`, `·`, `Yes`, `Resistant`, `Resistant`, `No-Moderate`, `Mild`],
+    [`DI3`, `<0.01`, `·`, `·`, `·`, `IgM; IgG`, `Yes`, `Yes`, `Resistant`, `Resistant`, `No-Severe`, `Mild-Severe`],
+  ]],
+  [`YT, ACHE`, [
+    [`YT1`, `>99.8`, `>99.8`, `·`, `·`, `IgG (IgG4)`, `·`, `Yes`, `Variable`, `Sensitive`, `No-Moderate`, `No`],
+    [`YT2`, `8`, `·`, `·`, `·`, `IgG`, `·`, `Yes`, `Variable`, `Sensitive`, `No`, `No`],
+  ]],
+  [`XG, MIC2`, [
+    [`XG1`, `F- 89 / M- 66`, `·`, `·`, `Variable`, `IgG;(IgM)`, `·`, `Yes`, `Sensitive`, `Resistant`, `No`, `No`],
+  ]],
+  [`DO, ART4`, [
+    [`DO1`, `67`, `55`, `·`, `·`, `IgG`, `·`, `Yes`, `Enhanced****`, `Sensitive`, `Delayed-Hemolytic`, `No/+DAT`],
+    [`DO2`, `82`, `89`, `·`, `·`, `IgG`, `·`, `Yes`, `Enhanced****`, `Sensitive`, `Acute, Delayed`, `No/+DAT`],
+    [`DO3`, `100`, `100`, `>99.9`, `·`, `IgG`, `·`, `Yes`, `Enhanced****`, `Sensitive`, `No-Moderate`, `No/+DAT`],
+    [`DO4`, `100`, `>99`, `100`, `·`, `IgG`, `·`, `Yes`, `Enhanced****`, `Sensitive`, `No-Moderate`, `No/+DAT`],
+    [`DO5`, `100`, `>99`, `100`, `·`, `IgG`, `·`, `Yes`, `Enhanced****`, `Variable`, `No-Moderate`, `No`],
+  ]],
+  [`CO, AQP1`, [
+    [`CO1`, `99,5`, `99,5`, `99,5`, `·`, `IgG; (IgM)`, `·`, `Yes`, `Resistant`, `Resistant`, `No-Moderate`, `Mild-Severe`],
+    [`CO2`, `10`, `10`, `10`, `·`, `IgG`, `·`, `Yes`, `Resistant`, `Resistant`, `No-Moderate`, `Mild`],
+  ]],
+  [`C4B`, [[`CH/RG1`, `96`, `·`, `·`, `Variable`, `IgG (IgG2; IgG4)`, `·`, `Yes`, `Sensitve (sic)`, `Resistant`, `No`, `No`]]],
+  [`C4A`, [[`CH/RG11`, `>98`, `>98`, `>98`, `Variable`, `IgG`, `·`, `Yes`, `Sensitive`, `Resistant`, `No`, `No`]]],
+  [`FUT1`, [[`H1`, `99,9`, `99,9`, `99,9`, `Variable`, `IgM; (IgG)`, `Yes`, `·`, `Enhanced`, `Resistant`, `No-Severe`, `No`]]],
+  [`GE, GYPC`, [
+    [`GE2`, `>99.9`, `>99.9`, `>99.9`, `·`, `IgG`, `·`, `Yes`, `Sensitive`, `Variable`, `No-Moderate`, `No/+DAT`],
+    [`GE3`, `>99.9`, `>99.9`, `>99.9`, `·`, `IgG; IgM`, `·`, `Yes`, `Resistant`, `Resistant`, `No-Moderate`, `+DAT/Severe`],
+    [`GE4`, `>99.9`, `>99.9`, `>99.9`, `·`, `IgG`, `·`, `Yes`, `Sensitive`, `Resistant`, `No Data`, `No Data`],
+  ]],
+  [`KN, CR1`, [[`KN1`, `98`, `99`, `·`, `Variable`, `IgG`, `·`, `Yes`, `Resistant*****`, `Sensitive`, `No`, `No`]]],
+  [`JMH, SEMA7A`, [[`JMH1`, `94,5`, `99,9`, `·`, `Variable`, `IgG`, `·`, `Yes`, `Sensitive`, `Sensitive`, `No`, `No`]]],
+  [`GCNT2`, [[`I1`, `>99`, `>99`, `>99`, `Variable`, `IgM; (IgG)`, `Yes`, `·`, `Enhanced`, `Resistant`, `No`, `No`]]],
+  [`B3GALNT1`, [[`GLOB1`, `>99.9`, `>99.9`, `>99.9`, `Variable`, `IgM; IgG`, `Yes`, `Yes`, `Enhanced`, `Resistant`, `No-Severe`, `No-Mild`]]],
+  [`LAN, ABCB6`, [[`LAN`, `>99`, `>99`, `>99`, `Variable`, `IgG`, `·`, `Yes`, `Resistant`, `Resistant`, `No-Severe /Hemolytic`, `No-Mild`]]],
+  [`SMIM1`, [[`VEL`, `>99`, `>99`, `>99`, `Variable`, `IgM with IgG`, `·`, `Yes`, `Enhanced`, `Variable`, `No-Severe /Hemolytic`, `+DAT/Severe`]]],
+];
+// Grifols poster, left half (Blood Group System and Antigen), keyed by ISBT symbol. Transcribed by Alexis from the poster photos, 11/19/2026.
+const GRIF_L: Record<string, [string, string]> = {
+  "ABO1": [`ABO 001`, `A`], "ABO2": [`ABO 001`, `B`], "ABO3": [`ABO 001`, `A,B`], "ABO4": [`ABO 001`, `A₁`],
+  "MNS1": [`MNS 002`, `M`], "MNS2": [`MNS 002`, `N`], "MNS3": [`MNS 002`, `S`], "MNS4": [`MNS 002`, `s`], "MNS5": [`MNS 002`, `U`], "MNS7": [`MNS 002`, `Miᵃ`], "MNS10": [`MNS 002`, `Mur`],
+  "P1PK1": [`P1PK 003`, `P₁`], "P1PK3": [`P1PK 003`, `Pᵏ`],
+  "RH1": [`Rh 004`, `D`], "RH2": [`Rh 004`, `C`], "RH3": [`Rh 004`, `E`], "RH4": [`Rh 004`, `c`], "RH5": [`Rh 004`, `e`], "RH6": [`Rh 004`, `f`], "RH7": [`Rh 004`, `Ce`], "RH8": [`Rh 004`, `Cʷ`], "RH10": [`Rh 004`, `V`], "RH12": [`Rh 004`, `G`], "RH19": [`Rh 004`, `hrˢ`], "RH20": [`Rh 004`, `VS`], "RH31": [`Rh 004`, `hrᴮ`],
+  "LU1": [`Lutheran 005`, `Luᵃ`], "LU2": [`Lutheran 005`, `Luᵇ`], "LU3": [`Lutheran 005`, `Lu3`],
+  "KEL1": [`Kell 006`, `K`], "KEL2": [`Kell 006`, `k`], "KEL3": [`Kell 006`, `Kpᵃ`], "KEL4": [`Kell 006`, `Kpᵇ`], "KEL6": [`Kell 006`, `Jsᵃ`], "KEL7": [`Kell 006`, `Jsᵇ`],
+  "LE1": [`Lewis 007`, `Leᵃ`], "LE2": [`Lewis 007`, `Leᵇ`],
+  "FY1": [`Duffy 008`, `Fyᵃ`], "FY2": [`Duffy 008`, `Fyᵇ`], "FY3": [`Duffy 008`, `Fy3`],
+  "JK1": [`Kidd 009`, `Jkᵃ`], "JK2": [`Kidd 009`, `Jkᵇ`], "JK3": [`Kidd 009`, `Jk3`],
+  "DI1": [`Diego 010`, `Diᵃ`], "DI2": [`Diego 010`, `Diᵇ`], "DI3": [`Diego 010`, `Wrᵃ`],
+  "YT1": [`Yt 011`, `Ytᵃ`], "YT2": [`Yt 011`, `Ytᵇ`],
+  "XG1": [`Xg 012`, `Xgᵃ`],
+  "DO1": [`Dombrock 014`, `Doᵃ`], "DO2": [`Dombrock 014`, `Doᵇ`], "DO3": [`Dombrock 014`, `Gyᵃ`], "DO4": [`Dombrock 014`, `Hy`], "DO5": [`Dombrock 014`, `Joᵃ`],
+  "CO1": [`Colton 015`, `Coᵃ`], "CO2": [`Colton 015`, `Coᵇ`],
+  "CH/RG1": [`Chido/Rodgers 017`, `Ch1`], "CH/RG11": [`Chido/Rodgers 017`, `Rg1`],
+  "H1": [`H 018`, `H`],
+  "GE2": [`Gerbich 020`, `Ge2`], "GE3": [`Gerbich 020`, `Ge3`], "GE4": [`Gerbich 020`, `Ge4`],
+  "KN1": [`Knops 022`, `Knᵃ`],
+  "JMH1": [`John Milton Hagen 026`, `JMH`],
+  "I1": [`I 027`, `I`],
+  "GLOB1": [`Globoside 028`, `P`],
+  "LAN": [`Lan 033`, `Lan`],
+  "VEL": [`Vel 034`, `Vel`],
+};
+const GRIF_KEYS: string[] = GRIF.flatMap(([, rows]: [string, GR[]]) => rows.map((r: GR) => r[0]));
+const GRIF_SYS = (k: string): string => (GRIF_L[k] ? GRIF_L[k][0] : "");
+const GRIF_SPAN: Record<string, number> = {};
+GRIF_KEYS.forEach((k: string, i: number) => { if (i === 0 || GRIF_SYS(GRIF_KEYS[i - 1]) !== GRIF_SYS(k)) { let n = 1; while (i + n < GRIF_KEYS.length && GRIF_SYS(GRIF_KEYS[i + n]) === GRIF_SYS(k)) n++; GRIF_SPAN[k] = n; } });
+const GRIF_FOOT: string[] = [
+  `† The enzyme & DTT information provided is to be used only as a guide because with all chemical treatment of RBCs, the effect varies depending on the exact conditions of treatment, purity of reagents and the age (condition) of the RBC's.`,
+  `†† Most Kell blood group system antigens are sensitive to treatment with a mixture of trypsin and α-chymotrypsin.`,
+  `* M,N: α-Chymotrypsin resistant`,
+  `** S,s: α-Chymotrypsin Sensitive`,
+  `*** Fyᵃ, Fyᵇ: Trypsin resistant (Fyᵇ weakened) (as read: the letter in the parentheses is hard to read on the poster)`,
+  `**** Dombrock system is sensitive to Trypsin`,
+  `***** Knᵃ: Papain resistant, ficin sensitive`,
+];
+const GRIF_REFS: string[] = [
+  `Daniels G, Poole J, de Silva M, Callaghan T, MacLennan S, Smith N. "The clinical significance of blood group antibodies". Transfusion Medicine, Vol 12(5), 287-2952, 2002.`,
+  `Reid M, Lomas-Francis C "Blood Group Antigens & Antibodies: A Guide to Clinical Relevance & Technical Tips". Starbright Books, 2007.`,
+  `Daniels G, Bromilow I. "Essential Guide to Blood Groups". Wiley-Blackwell, 2nd Edition, 2010.`,
+  `Roback JD. "Technical manual". American Association of Blood Banks, 17th Edition, 2011.`,
+  `Reid ME, Lomas-Francis C, Olson ML. "The Blood Group Antigen FactsBook". Academic Press, 3rd Edition, 2012.`,
+  `Storry JR, Joud M, Christophersen MK, Thuresson B, Akerstrom B, Sojka BN, Nilsson B, Olsson ML. "Homozygosity for a null allele of SMIM1 defines the Vel-negative blood group phenotype". Nature Genetics. Vol 45(5), 537-541, 2013.`,
+];
+// Schneck blood bank posted sheet "Selection of units (substitution list)". [recipient, donor O, donor A, donor B, donor AB]; "" = not listed.
+const CRYO: [string, string, string, string, string][] = [
+  [`O`, `Y`, `Y`, `Y`, `Y`],
+  [`A`, `Also Compatible`, `Y`, `Also compatible`, `Y`],
+  [`B`, `Also Compatible`, `Also compatible`, `Y`, `Y`],
+  [`AB`, `Also Compatible`, `Also Compatible`, `Also Compatible`, `Y`],
+];
+const PLASMA: [string, string, string, string, string][] = [
+  [`O`, `Y`, `Y`, `Y`, `Y`],
+  [`A`, ``, `Y`, ``, `Y`],
+  [`B`, ``, ``, `Y`, `Y`],
+  [`AB`, ``, ``, ``, `Y`],
+];
+const GR_BG: string[] = ["", "rgba(110,180,200,0.20)", "rgba(110,180,200,0.20)", "rgba(110,180,200,0.20)", "rgba(235,225,190,0.25)", "rgba(180,110,170,0.18)", "rgba(200,150,190,0.14)", "rgba(200,150,190,0.14)", "rgba(200,150,190,0.14)", "rgba(200,150,190,0.14)", "rgba(120,90,170,0.22)", "rgba(150,120,190,0.14)"];
 
 const BOLD_START = [9, 13, 21];
 const BOLD_END = [10, 16, 21];
@@ -326,6 +601,10 @@ export default function App() {
   const [het, setHet] = useState<boolean>(false);
   const [schneck, setSchneck] = useState<boolean>(true);
   const [antiD, setAntiD] = useState<boolean>(false);
+  const [inclSC, setInclSC] = useState<boolean>(true);
+  const [rule2, setRule2] = useState<boolean>(false);
+  const [txRecent, setTxRecent] = useState<boolean>(false);
+  const [datPos, setDatPos] = useState<boolean>(false);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [example, setExample] = useState<boolean>(false);
   const [brand, setBrand] = useState<string>(BRANDS[0]);
@@ -373,17 +652,17 @@ export default function App() {
 
   const analysis = useMemo(() => {
     const ent = (i: number): string[] => [rIS[i], r37[i], rx[i]].filter((g: string) => g !== "" && g !== "nt");
-    const tested = Array.from({ length: N }, (_v: unknown, i: number) => i).filter((i: number) => ent(i).length > 0);
+    const tested = Array.from({ length: N }, (_v: unknown, i: number) => i).filter((i: number) => (inclSC || i >= NS) && ent(i).length > 0);
     const neg = tested.filter((i: number) => ent(i).every((g: string) => g === "0"));
     const pos = tested.filter((i: number) => ent(i).some(isReactive));
     const ruled: { ag: string; cells: string[] }[] = [];
-    const cands: { ag: string; match: boolean; posPos: number; negNeg: number; unexplained: string[]; homo: number; hetN: number; lfa: boolean; single: boolean }[] = [];
+    const cands: { ag: string; match: boolean; posPos: number; negNeg: number; unexplained: string[]; homo: number; hetN: number; dNeg: number; lfa: boolean; single: boolean }[] = [];
     AG.forEach((ag: string, ai: number) => {
       const p = PARTNER[ag];
       let used: number[] = [];
-      let homo = 0; let hetN = 0;
+      let homo = 0; let hetN = 0; let dNeg = 0;
       const sp = SCHNECK_PARTNER[ag];
-      const single = !sp || SCHNECK_SINGLE.includes(ag) || (antiD && (ag === "C" || ag === "E"));
+      const single = !SCHNECK_DOUBLE.includes(ag) && (!sp || SCHNECK_SINGLE.includes(ag));
       if (!schneck) {
         used = neg.filter((i: number) => {
           if (val(i, ai) !== "+") return false;
@@ -392,20 +671,20 @@ export default function App() {
         });
       } else {
         const agPos = neg.filter((i: number) => val(i, ai) === "+");
-        const homoCells = sp ? agPos.filter((i: number) => val(i, AG.indexOf(sp)) === "0") : agPos;
-        const hetCells = sp ? agPos.filter((i: number) => val(i, AG.indexOf(sp)) === "+") : [];
-        homo = homoCells.length; hetN = hetCells.length;
-        if (single) { if (agPos.length >= SCH_DOUBLE_N) used = agPos; }
-        else if (homoCells.length >= SCH_DOUBLE_N) used = homoCells;
-        else if (hetCells.length >= SCH_HET_N) used = hetCells;
+        const homoCells = sp && !single ? agPos.filter((i: number) => val(i, AG.indexOf(sp)) === "0") : agPos;
+        const hetCells = sp && !single ? agPos.filter((i: number) => val(i, AG.indexOf(sp)) === "+") : [];
+        const dCells = antiD && (ag === "C" || ag === "E") ? hetCells.filter((i: number) => val(i, AG.indexOf("D")) === "0") : [];
+        homo = homoCells.length; hetN = hetCells.length; dNeg = dCells.length;
+        if (homoCells.length >= SCH_N) used = homoCells;
+        else if (dCells.length >= SCH_N) used = dCells;
       }
       if (used.length > 0) { ruled.push({ ag, cells: used.map(nm) }); return; }
       const unexplained = pos.filter((i: number) => val(i, ai) !== "+").map(nm);
-      cands.push({ ag, match: pos.length > 0 && unexplained.length === 0, posPos: pos.filter((i: number) => val(i, ai) === "+").length, negNeg: neg.filter((i: number) => val(i, ai) === "0").length, unexplained, homo, hetN, lfa: schneck && SCHNECK_LFA.includes(ag), single });
+      cands.push({ ag, match: pos.length > 0 && unexplained.length === 0, posPos: pos.filter((i: number) => val(i, ai) === "+").length, negNeg: neg.filter((i: number) => val(i, ai) === "0").length, unexplained, homo, hetN, dNeg, lfa: schneck && SCHNECK_LFA.includes(ag), single });
     });
     const extraPos = schneck ? pos.filter((i: number) => cands.every((c) => val(i, AG.indexOf(c.ag)) !== "+")).map(nm) : [];
     return { tested: tested.length, pos, neg, ruled, cands, extraPos };
-  }, [rx, rIS, r37, het, pLot, sLot, xOn, xLot, edits, schneck, antiD]);
+  }, [rx, rIS, r37, het, pLot, sLot, xOn, xLot, edits, schneck, antiD, inclSC]);
 
   const cell: CSSProperties = { padding: "6px 6px", borderBottom: `1px solid ${t.border.subtle}`, textAlign: "center", fontSize: t.font.table.fontSize, color: t.text.primary };
   const head: CSSProperties = { ...cell, color: t.text.secondary, fontWeight: t.weight.medium, borderBottom: `1px solid ${t.border.default}` };
@@ -446,7 +725,9 @@ export default function App() {
   };
   const calcAgs = AG.filter((a: string) => fv(a) !== null);
   const notRuled = analysis.cands.filter((c) => !c.lfa).map((c) => c.ag);
-  const minPos = schneck ? 2 : 3;
+  const minPos = schneck && rule2 ? 2 : 3;
+  const minNeg = schneck && rule2 ? 2 : 3;
+  const vRule = minPos === 2 ? "2+/2−" : "3+/3−";
   const effSel = calcAuto ? notRuled : calcSel;
   const noData = calcAuto ? notRuled.filter((a: string) => !calcAgs.includes(a)) : [];
   const calcUsed = effSel.filter((a: string) => calcAgs.includes(a));
@@ -464,7 +745,7 @@ export default function App() {
   const grpBg = (gi: number): CSSProperties => ({ background: AG.slice(gStart[gi], gStart[gi] + GROUPS[gi].n).every((a) => ruledSet.has(a)) && xOut ? `linear-gradient(${RED}, ${RED}) center / 80% 3px no-repeat, ${YEL}` : YEL });
   const anyEntered = analysis.tested > 0;
   const matching = analysis.cands.filter((c) => c.match);
-  const validated = analysis.cands.filter((c) => c.posPos >= minPos && c.negNeg >= 3);
+  const validated = analysis.cands.filter((c) => c.posPos >= minPos && c.negNeg >= minNeg);
   useEffect(() => {
     const on = () => setPr(true);
     const off = () => setPr(false);
@@ -488,7 +769,7 @@ export default function App() {
   return (
     <Page title="AntibodyID Pro: Schneck Edition" width="wide" summary="Antibody Identification Worksheet · Grifols Search-Cyte Plus 0.8% screen cells and Data-Cyte Plus panel cells, with Schneck Medical Center Ab ID rules on by default. Pick the screen and panel lots, grade each cell, and see which antibodies are ruled out, which remain, whether the validation rule is met, and how many units to screen.">
       <style>{PRINT_CSS}</style>
-      <div className="printonly" style={{ fontSize: 11 }}>AntibodyID Pro: Schneck Edition · Printed {new Date().toLocaleString()} · Screen lot {SL.lot} (exp {SL.exp}) · Panel lot {PL.lot} (exp {PL.exp}){xOn ? ` · Additional expired panel ${XL.lot} (exp ${XL.exp})` : ""} · Schneck rules {schneck ? "on" : "off"} · Anti-D detected {schneck && antiD ? "on" : "off"} · Heterozygous rule-outs {schneck ? "n/a (Schneck rules on)" : het ? "on" : "off"} · Auto cross-outs {xOut ? "on" : "off"}</div>
+      <div className="printonly" style={{ fontSize: 11 }}>AntibodyID Pro: Schneck Edition · Printed {new Date().toLocaleString()} · Screen lot {SL.lot} (exp {SL.exp}) · Panel lot {PL.lot} (exp {PL.exp}){xOn ? ` · Additional expired panel ${XL.lot} (exp ${XL.exp})` : ""} · Schneck rules {schneck ? "on" : "off"} · Anti-D detected {schneck && antiD ? "on" : "off"} · Heterozygous rule-outs {schneck ? "n/a (Schneck rules on)" : het ? "on" : "off"} · Auto cross-outs {xOut ? "on" : "off"} · Screen cells in cross-outs {inclSC ? "on" : "off"} · Confirmation {schneck && rule2 ? "Rule of Two (2+/2−)" : "Rule of Three (3+/3−)"} · Transfused in last 3 months {txRecent ? "yes" : "not marked"} · Positive IgG DAT {datPos ? "yes" : "not marked"}</div>
       <div style={{ background: NAVY, color: "#fff", borderRadius: 12, padding: "14px 16px", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ minWidth: 0, flex: "1 1 260px" }}>
           <div style={{ fontSize: 16, fontWeight: 600 }}>AntibodyID Pro: Schneck Edition</div>
@@ -498,22 +779,24 @@ export default function App() {
             {schneck && chip(antiD ? "Anti-D detected ON" : "Anti-D detected off", antiD ? GREEN : SLATE)}
             {!schneck && chip(het ? "Heterozygous rule-outs ON" : "Heterozygous rule-outs off", SLATE)}
             {chip(xOut ? "Auto cross-outs ON" : "Auto cross-outs off", SLATE)}
+            {chip(inclSC ? "Screen cells counted in cross-outs" : "Screen cells NOT counted", inclSC ? SLATE : AMBER)}
+            {schneck && chip(rule2 ? "Rule of Two (2+/2−) ON" : "Rule of Three (3+/3−)", rule2 ? AMBER : SLATE)}
           </div>
         </div>
         <div className="noprint" style={{ background: "#fff", borderRadius: 8, padding: 2 }}><Button label="Print worksheet" variant="primary" onClick={doPrint} /></div>
       </div>
-      <div className="noprint" style={{ fontSize: 12, color: t.text.secondary }}>Print includes every step and every Reference section (5.1–5.8), landscape. If nothing happens, use your browser's Print (Ctrl/Cmd+P).</div>
+      <div className="noprint" style={{ fontSize: 12, color: t.text.secondary }}>Print includes every step and every Reference section (5.1–5.14), landscape. If nothing happens, use your browser's Print (Ctrl/Cmd+P).</div>
       <div className="noprint"><Segmented options={STEPS} value={tab} onChange={(v: string) => setTab(v)} /></div>
       <Section heading="Current conclusion" caption="Updates live from the reactions entered in step 2.">
         <div style={{ display: "flex", flexWrap: "wrap" }}>
           {chip(`${analysis.ruled.length} ruled out`, GREEN)}
           {chip(`${analysis.cands.length} not excluded`, analysis.cands.length ? AMBER : SLATE)}
-          {chip(`${validated.length} validated (${schneck ? "2+/3−" : "3+/3−"})`, validated.length ? NAVY : SLATE)}
+          {chip(`${validated.length} validated (${vRule})`, validated.length ? NAVY : SLATE)}
           {anyEntered && acPos && chip("Autocontrol positive", CRIT)}
           {anyEntered && schneck && analysis.extraPos.length > 0 && chip("Unexplained positives", CRIT)}
         </div>
         <Rows rows={[
-          { title: "Cells graded", detail: `${analysis.pos.length} reactive, ${analysis.neg.length} nonreactive`, meta: `${analysis.tested} of ${N}` },
+          { title: "Cells graded", detail: `${analysis.pos.length} reactive, ${analysis.neg.length} nonreactive`, meta: `${analysis.tested} of ${N}${inclSC ? "" : " (screen cells not counted)"}` },
           { title: "Pattern match", detail: !anyEntered ? "Enter results in step 2." : matching.length ? matching.map((c) => `anti-${LABEL[c.ag]}`).join(", ") : analysis.pos.length ? "No single antibody explains all reactive cells." : "No reactive cells entered.", status: { label: matching.length ? "Pattern match" : analysis.pos.length ? "Not explained" : "Negative", tone: matching.length ? "success" : analysis.pos.length ? "warning" : undefined } },
           { title: "Validated", detail: validated.length ? validated.map((c) => `anti-${LABEL[c.ag]}`).join(", ") : "None yet" },
           { title: "Not excluded", detail: analysis.cands.length ? analysis.cands.map((c) => `anti-${LABEL[c.ag]}${c.lfa ? " (LFA)" : ""}`).join(", ") : "None: every antibody on the antigram is ruled out" },
@@ -530,13 +813,27 @@ export default function App() {
           {xOn && <Select label="Additional panel lot (expired)" options={EXPIRED_IDX.filter((i: number) => B_LOTS[i].brand === brand).map((i: number) => ({ value: String(i), label: `${B_LOTS[i].brand} ${B_LOTS[i].product} ${B_LOTS[i].lot}, EXPIRED ${B_LOTS[i].exp}` }))} value={xLot} onChange={(v: string) => { setXLot(v); clearRows(NP, NR); }} />}
         </div>
       </Section>
+      <Section heading="Initial evaluation and autocontrol (Tech Guide section 1)" caption="Schneck Blood Bank Tech Guide: Antibody Identification (11/2026). Checklist reminders; the two switches drive the patient antigen typing reminder in step 3.">
+        <Rows rows={[
+          { title: "Review patient history", detail: "Verify transfusion and pregnancy history (past 3 months), diagnosis, and past Ab/phenotype records." },
+          { title: "Autocontrol / DAT negative", detail: "Suggests alloantibody." },
+          { title: "Autocontrol / DAT positive", detail: "Indicates possible autoantibody, drug-induced reactivity, or alloantibody on recently transfused donor cells. Perform DAT." },
+        ]} />
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+          <Toggle label="Transfused in the last 3 months" value={txRecent} onChange={setTxRecent} />
+          <Toggle label="Positive IgG DAT" value={datPos} onChange={setDatPos} />
+        </div>
+      </Section>
       <Section heading="Rule settings" caption="These change the rule-out logic.">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
           <Toggle label="Schneck rules" value={schneck} onChange={setSchneck} />
           {schneck && <Toggle label="Anti-D detected" value={antiD} onChange={setAntiD} />}
+          <Toggle label="Include screen cells in cross-outs" value={inclSC} onChange={setInclSC} />
+          {schneck && <Toggle label="Rule of Two (2+/2−): only for low-frequency antibodies (e.g., Cʷ, Kpᵃ) or selected cells in complex multi-antibody cases per medical director validation" value={rule2} onChange={setRule2} />}
           <Toggle label="Allow heterozygous rule-outs (Rh, Kidd, Duffy, MNS)" value={het} onChange={setHet} disabled={schneck} />
         </div>
-        {schneck && <Callout tone="info" lead="Schneck SOP rules active.">{`Rule-out needs 2 nonreactive double-dose (homozygous) cells, e.g. C+c− for C. Single dose is allowed for D, K, P₁ and Xgᵃ (f is not on the antigram), and for antigens with no partner on the antigram (Leᵃ, Leᵇ, Cʷ, Kpᵃ, Luᵃ): 2 nonreactive antigen-positive cells. ${antiD ? "Anti-D detected is on: 2 nonreactive C+c+ cells rule out C and 2 nonreactive E+e+ cells rule out E." : "Anti-D detected is off."} Otherwise 3 nonreactive single-dose (heterozygous) cells rule out. Low-frequency V, Cʷ, Kpᵃ, Jsᵃ, Luᵃ are tagged and left out of units to screen. Validation: 2 positives and 3 negatives. For dosage, k is paired with K (k is ruled out by 2 K−k+ cells or 3 K+k+ cells). The heterozygous toggle is ignored while Schneck rules are on.`}</Callout>}
+        {schneck && <Callout tone="info" lead="Schneck Tech Guide (11/2026) rules active.">{`Only one nonreactive panel cell (negative across all phases) is needed to cross out an antigen. Double-dose required: C (C+c−), c (C−c+), E (E+e−), e (E−e+), Fyᵃ (Fy(a+b−)), Fyᵇ (Fy(a−b+)), Jkᵃ (Jk(a+b−)), Jkᵇ (Jk(a−b+)), M (M+N−), N (M−N+), S (S+s−), s (S−s+); single-dose cells do not rule these out. Single-dose permitted: D, K, P₁, Xgᵃ, Leᵃ, Leᵇ, Luᵃ (Luᵇ is in the guide but is not an antigram column). ${antiD ? "Anti-D detected is on: 1 nonreactive D− C+c+ cell rules out C and 1 nonreactive D− E+e+ cell rules out E." : "Anti-D detected is off."} Antigram antigens the guide does not list: k needs 1 double-dose K−k+ cell; Cʷ and Kpᵃ need 1 antigen-positive cell (no partner on the antigram). Low-frequency V, Cʷ, Kpᵃ, Jsᵃ, Luᵃ may be omitted during the initial exclusion: they are tagged and left out of units to screen. Confirming specificity (not rule-out): Rule of Three, 3 antigen-positive reactive and 3 antigen-negative nonreactive cells (p ≤ 0.05); Rule of Two (2+/2−) only with the option above. The heterozygous toggle is ignored while Schneck rules are on.`}</Callout>}
+        {!inclSC && <Text>Screen cells SC I and SC II are still shown in step 2 but are not counted for rule-outs, antibodies not excluded, units to screen, or the 3+/3− (or 2+/2−) counts.</Text>}
       </Section>
       <Section heading="Display options" caption="Display only; rule-out logic and interpretation are unaffected.">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
@@ -572,7 +869,7 @@ export default function App() {
                 <Fragment key={ci}>
                 {(ci === NS || ci === NP) && <tr><td colSpan={29} style={{ padding: 0, height: 4, background: t.text.secondary }}></td></tr>}
                 <tr style={{ background: rowBg(ci) ?? "transparent" }}>
-                  <td style={{ ...cell, textAlign: "left", whiteSpace: "nowrap", position: "sticky", left: 0, zIndex: 1, background: t.bg.base, backgroundImage: rowBg(ci) ? `linear-gradient(${rowBg(ci)}, ${rowBg(ci)})` : "none" }}>{nm(ci)} <span style={{ color: t.text.tertiary }}>{L.donors[ci]}</span>{ci >= NP && <span style={{ color: t.text.danger, fontSize: 10, fontWeight: t.weight.semibold, marginLeft: 4 }}>EXPIRED {XL.exp}</span>}</td>
+                  <td style={{ ...cell, textAlign: "left", whiteSpace: "nowrap", position: "sticky", left: 0, zIndex: 1, background: t.bg.base, backgroundImage: rowBg(ci) ? `linear-gradient(${rowBg(ci)}, ${rowBg(ci)})` : "none" }}>{nm(ci)} <span style={{ color: t.text.tertiary }}>{L.donors[ci]}</span>{ci < NS && !inclSC && <span style={{ color: t.text.warning, fontSize: 10, fontWeight: t.weight.semibold, marginLeft: 4 }}>NOT COUNTED</span>}{ci >= NP && <span style={{ color: t.text.danger, fontSize: 10, fontWeight: t.weight.semibold, marginLeft: 4 }}>EXPIRED {XL.exp}</span>}</td>
                   <td style={cell}>{rh}</td>
                   {AG.map((a: string, ai: number) => {
                     const v = val(ci, ai);
@@ -606,24 +903,25 @@ export default function App() {
       {show("interp") && <Fragment>
       <Section heading="3. Interpretation" caption="Rule-outs, antibodies not excluded, validation rule, and autocontrol / DAT.">
         {!anyEntered && <Text>Enter results in step 2 to see the interpretation.</Text>}
-        {anyEntered && [acIS, ac37, ac].some(isReactive) && <Callout tone="danger" lead="Autocontrol positive.">Perform a DAT; consider a warm or cold autoantibody, recent transfusion (delayed reaction), or drug-related antibody before relying on rule-outs.</Callout>}
+        {anyEntered && [acIS, ac37, ac].some(isReactive) && <Callout tone="danger" lead="Autocontrol positive.">Perform a DAT; consider a warm or cold autoantibody, recent transfusion (delayed reaction), or drug-related antibody before relying on rule-outs. Tech Guide section 1: positive indicates possible autoantibody, drug-induced reactivity, or alloantibody on recently transfused donor cells. Perform DAT.</Callout>}
+        {anyEntered && ![acIS, ac37, ac].some(isReactive) && [acIS, ac37, ac].some((g: string) => g === "0") && <Text>Autocontrol negative: suggests alloantibody (Tech Guide section 1).</Text>}
         {anyEntered && example && <Callout tone="info" lead="Example data.">Every Fyᵃ-positive cell graded 2+ at AHG, all others 0. Not a patient result.</Callout>}
-        {anyEntered && schneck && analysis.extraPos.length > 0 && <Callout tone="danger" lead="Unexplained positive reaction(s): check for another antibody (e.g., low-frequency antibody).">{`Reactive cell(s) negative for every antibody not ruled out: ${analysis.extraPos.join(", ")}.`}</Callout>}
-        {anyEntered && schneck && <Callout tone="warning" lead="Schneck SOP reminder.">Once finished with Ab ID, ALWAYS go back and make sure that ALL positive patient results are accounted for. (If do have extra positives, will need to go back and make sure not missing another antibody; like a LFA.)</Callout>}
+        {anyEntered && schneck && analysis.extraPos.length > 0 && <Callout tone="danger" lead="Unexplained positive reaction(s): account for ALL reactivity.">{`Reactive cell(s) negative for every antibody not ruled out: ${analysis.extraPos.join(", ")}. Tech Guide section 3: ensure 100% of positive reactions are explained; check for additional antibodies (including LFAs), antibodies to high-prevalence antigens, or dosage effects.`}</Callout>}
+        {anyEntered && schneck && <Callout tone="warning" lead="Tech Guide section 3: Account for ALL Reactivity.">Ensure 100% of positive reactions are explained. If extra positives exist, check for additional antibodies (including LFAs), antibodies to high-prevalence antigens, or dosage effects.</Callout>}
         {anyEntered && <Rows rows={[
-          { title: "Cells graded", detail: `${analysis.pos.length} reactive, ${analysis.neg.length} nonreactive`, meta: `${analysis.tested} of ${N}` },
+          { title: "Cells graded", detail: `${analysis.pos.length} reactive, ${analysis.neg.length} nonreactive`, meta: `${analysis.tested} of ${N}${inclSC ? "" : " (screen cells not counted)"}` },
           { title: "Single antibody explaining all reactive cells", detail: matching.length ? matching.map((c) => `anti-${LABEL[c.ag]}`).join(", ") : analysis.pos.length ? "None. Consider multiple antibodies, an antibody to an antigen not on the antigram, dosage, or an autoantibody." : "No reactive cells entered.", status: { label: matching.length ? "Pattern match" : analysis.pos.length ? "Not explained" : "Negative", tone: matching.length ? "success" : analysis.pos.length ? "warning" : undefined } },
         ]} />}
         {anyEntered && matching.length > 1 && <Text>More than one candidate fits the pattern; test selected cells to separate them.</Text>}
         {anyEntered && analysis.cands.length > 0 && (
-          <Section heading={schneck ? "3a. Not excluded (candidates) and Schneck 2+/3− validation" : "3a. Not excluded (candidates) and rule of three"}>
-            <Table columns={schneck ? ["Antibody", "Explains reactive cells", "Ag+ reactive", "Ag− nonreactive", "Schneck: 2+/3−", "Nonreactive Ag+ cells"] : ["Antibody", "Explains reactive cells", "Ag+ reactive", "Ag− nonreactive", "3+/3− (p ≤ 0.05)"]}
+          <Section heading={schneck ? `3a. Not excluded (candidates) and Schneck ${vRule} confirmation` : "3a. Not excluded (candidates) and rule of three"}>
+            <Table columns={schneck ? ["Antibody", "Explains reactive cells", "Ag+ reactive", "Ag− nonreactive", `Schneck: ${vRule}`, "Nonreactive Ag+ cells"] : ["Antibody", "Explains reactive cells", "Ag+ reactive", "Ag− nonreactive", "3+/3− (p ≤ 0.05)"]}
               rows={analysis.cands.map((c) => [
                 c.lfa ? <span>{`anti-${LABEL[c.ag]}${negTxt(c.ag)} `}<span style={{ fontStyle: "italic", color: t.text.tertiary }}>Low-frequency: may be omitted initially</span></span> : `anti-${LABEL[c.ag]}${negTxt(c.ag)}`,
                 c.match ? { text: "Yes", tone: "success" as const } : c.unexplained.length ? `No (cells ${c.unexplained.join(", ")} Ag−/?)` : "No reactive cells",
                 String(c.posPos), String(c.negNeg),
-                c.posPos >= minPos && c.negNeg >= 3 ? { text: `Met (${c.posPos}+/${c.negNeg}−)`, tone: "success" as const } : { text: `Not met (${c.posPos}+/${c.negNeg}−)`, tone: "warning" as const },
-                ...(schneck ? [c.single ? `single dose OK: ${c.homo} of 2` : `double dose ${c.homo} of 2 / single dose ${c.hetN} of 3`] : []),
+                c.posPos >= minPos && c.negNeg >= minNeg ? { text: `Met (${c.posPos}+/${c.negNeg}−)`, tone: "success" as const } : { text: `Not met (${c.posPos}+/${c.negNeg}−)`, tone: "warning" as const },
+                ...(schneck ? [c.single ? `single dose OK: ${c.homo} of 1` : `double dose ${c.homo} of 1${antiD && (c.ag === "C" || c.ag === "E") ? ` / D− ${c.ag === "C" ? "C+c+" : "E+e+"} ${c.dNeg} of 1` : ""} (${c.hetN} single-dose, not accepted)`] : []),
               ])} />
             <Text>Candidates with no matching pattern still need rule-out with selected cells if clinically significant.</Text>
           </Section>
@@ -631,9 +929,12 @@ export default function App() {
         {anyEntered && analysis.ruled.length > 0 && (
           <Section heading="3b. Rule-out">
             <Table columns={["Antibody", `Ruled out on nonreactive cell(s)`]} rows={analysis.ruled.map((r) => [`anti-${LABEL[r.ag]}`, r.cells.join(", ")])} />
-            <Text>{schneck ? "Schneck rules: 2 nonreactive double-dose (homozygous) cells; or 2 nonreactive antigen-positive cells for D, K, P₁, Xgᵃ and antigens with no partner on the antigram; or 2 nonreactive C+c+ / E+e+ cells for C / E when Anti-D detected is on; otherwise 3 nonreactive single-dose (heterozygous) cells." : het ? "Heterozygous cells are being used for rule-outs (toggle on)." : "Rh (C, c, E, e), Kidd, Duffy and MNS antigens are ruled out only on homozygous cells; all others on any antigen-positive nonreactive cell."}</Text>
+            <Text>{schneck ? `Schneck Tech Guide (11/2026), only one needed: 1 nonreactive double-dose (homozygous) cell for C, c, E, e, Fyᵃ, Fyᵇ, Jkᵃ, Jkᵇ, M, N, S, s (and k: K−k+); 1 nonreactive antigen-positive cell for D, K, P₁, Xgᵃ, Leᵃ, Leᵇ, Luᵃ, Cʷ, Kpᵃ; with Anti-D detected on, 1 nonreactive D− C+c+ / D− E+e+ cell for C / E.${inclSC ? "" : " Screen cells are not counted."}` : het ? "Heterozygous cells are being used for rule-outs (toggle on)." : "Rh (C, c, E, e), Kidd, Duffy and MNS antigens are ruled out only on homozygous cells; all others on any antigen-positive nonreactive cell."}</Text>
           </Section>
         )}
+        {anyEntered && schneck && <Section heading="3c. Patient antigen typing (Tech Guide section 4)">
+          {(txRecent || datPos) ? <Callout tone="danger" lead="STOP: do NOT perform routine serologic phenotyping.">{`${txRecent ? "The patient was transfused in the last 3 months (risk of mixed-field reactions). " : ""}${datPos ? "The patient has a positive IgG DAT (risk of false-positive reactions at the IAT phase). " : ""}Action: in these cases, utilize molecular RBC genotyping or historical pre-transfusion records.`}</Callout> : <Text>{`Requirement: patient must type antigen-negative for the suspected corresponding antibody${matching.length ? ` (${matching.map((c) => `${LABEL[c.ag]}−`).join(", ")})` : ""}. STOP, do not perform routine serologic phenotyping if the patient was transfused in the last 3 months or has a positive IgG DAT (mark these in step 1); use molecular RBC genotyping or historical pre-transfusion records instead.`}</Text>}
+        </Section>}
       </Section>
       </Fragment>}
       {show("units") && <Fragment>
@@ -666,8 +967,8 @@ export default function App() {
       </Section>
       </Fragment>}
       {show("ref") && <Fragment>
-      <Section heading="5. Reference" caption="Antigen frequencies, clinical significance, phenotypes, antibody frequencies, Schneck helpful hints and sources. Tap a heading to expand.">
-        <div className="noprint"><Input label="Search reference section titles" value={refQ} onChange={(v: string) => setRefQ(v)} placeholder="e.g. dosage, Bio-Rad, phenotypes, Schneck" /></div>
+      <Section heading="5. Reference" caption="Antigen frequencies, clinical significance, phenotypes, antibody frequencies, Bio-Rad and dosage references, Schneck helpful hints (superseded), then the guides and charts at the end: Schneck Tech Guide (11/2026), compatibility chart, component selection, cryo & plasma compatibility, Ortho Antibody Index Chart and Grifols antigens & antibodies poster. Tap a heading to expand.">
+        <div className="noprint"><Input label="Search reference section titles" value={refQ} onChange={(v: string) => setRefQ(v)} placeholder="e.g. dosage, Bio-Rad, Schneck, Tech Guide, compatibility, cryo, plasma, Ortho, Grifols" /></div>
       {rs("5.1 Antigen frequencies") && <Fragment>
       <Section key={pr ? "p51" : "s51"} heading="5.1 Antigen frequencies" collapsible defaultOpen={pr}>
         <Callout tone="info" lead="Population estimates.">Frequencies are rounded population estimates from published references; verify against your lab's reference. Cw is omitted (could not verify). Xga is X-linked: F = females, M = males (Northern European data); no verified Black value. Lewis values are for adults. Verify against your facility's SOP and reference before selecting units.</Callout>
@@ -830,14 +1131,137 @@ export default function App() {
           {Object.entries(DOSE_COL).map(([k, c]) => <span key={k}><span style={{ display: "inline-block", width: 12, height: 12, background: c, verticalAlign: "middle", marginRight: 4 }}></span>{k === "Yes" ? "Yes: may show dosage" : k === "Variable" ? "Variable: antigen strength varies, not classic genetic dosage" : k === "No" ? "No: no dosage / not applicable" : "Not verified: not confirmed in the sources checked"}</span>)}
         </div>
         <Text>On this Page: the rule-out logic uses homozygous cells only for Rh (C, c, E, e), Kidd, Duffy and MNS unless the 'Allow heterozygous rule-outs (Rh, Kidd, Duffy, MNS)' toggle in step 1 is on.</Text>
-        <Text>With Schneck rules on (the default here), that toggle is ignored and the Schneck dosage rules in section 5.8 apply instead.</Text>
+        <Text>With Schneck rules on (the default here), that toggle is ignored and the Schneck Tech Guide (11/2026) rules in section 5.9 apply instead (the Helpful Hints in 5.8 are superseded).</Text>
         <Text>Sources: {DOSE_SRC.join(" · ")}</Text>
       </Section>
       </Fragment>}
-      {rs("5.8 Schneck Ab ID Helpful Hints") && <Fragment>
-      <Section key={pr ? "p58" : "s58"} collapsible defaultOpen={pr} heading="5.8 Schneck Ab ID Helpful Hints" caption="Source: Schneck Medical Center blood bank SOP, Ab ID Helpful Hints sheet. Transcribed as written.">
+      {rs("5.8 Schneck Ab ID Helpful Hints (superseded by 11/2026 Tech Guide)") && <Fragment>
+      <Section key={pr ? "p58" : "s58"} collapsible defaultOpen={pr} heading="5.8 Schneck Ab ID Helpful Hints (superseded by 11/2026 Tech Guide)" caption="Source: Schneck Medical Center blood bank SOP, Ab ID Helpful Hints sheet. Transcribed as written. Superseded by the Schneck Blood Bank Tech Guide: Antibody Identification (11/2026), section 5.9; kept for reference only.">
         <Table columns={["Rule", "As written on the sheet"]} rows={SCH_HINTS} />
-        <Text>How this Page applies it: 2 nonreactive double-dose cells rule out; the single-dose exceptions and the Anti-D C+c+ / E+e+ allowance also need 2 nonreactive cells; otherwise 3 nonreactive single-dose cells. f is listed on the sheet but is not on the Grifols antigram, so it is not used. V and Jsᵃ are not antigram columns, so only Cʷ, Kpᵃ and Luᵃ are tagged in the candidates table.</Text>
+        <Text>How earlier versions of this Page applied it (superseded, no longer used): 2 nonreactive double-dose cells rule out; the single-dose exceptions and the Anti-D C+c+ / E+e+ allowance also need 2 nonreactive cells; otherwise 3 nonreactive single-dose cells. f is listed on the sheet but is not on the Grifols antigram, so it is not used. V and Jsᵃ are not antigram columns, so only Cʷ, Kpᵃ and Luᵃ are tagged in the candidates table.</Text>
+      </Section>
+      </Fragment>}
+      {rs("5.9 Schneck Blood Bank Tech Guide: Antibody Identification (11/2026)") && <Fragment>
+      <Section key={pr ? "p59" : "s59"} collapsible defaultOpen={pr} heading="5.9 Schneck Blood Bank Tech Guide: Antibody Identification (11/2026)" caption="Source: Schneck Medical Center, 411 W. Tipton, Seymour, IN 47274. Blood Bank Tech Guide: Antibody Identification, dated 11/2026 (2 pages). Transcribed as written. The Schneck rules on this Page follow this guide.">
+        <Text>1. Initial Evaluation & Autocontrol</Text>
+        <Table columns={["Item", "As written in the guide"]} rows={TG1} />
+        <Text>2. Antigen Exclusion (Rule-Out) Criteria (Only one needed). Use non-reactive panel cells (negative across all phases) to cross out antigens.</Text>
+        <Table columns={["Exclusion Type", "Blood Group Systems & Allowed Cells"]} rows={TG2} />
+        <Text>Note: Low-Frequency Antigens (V, Cʷ, Kpᵃ, Jsᵃ, Luᵃ) may be omitted during the initial exclusion process.</Text>
+        <Text>3. Confirming Antibody Specificity (this is not the rule out criteria)</Text>
+        <Table columns={["Item", "As written in the guide"]} rows={TG3} />
+        <Text>4. Patient Antigen Typing (Phenotyping)</Text>
+        <Table columns={["Item", "As written in the guide"]} rows={TG4} />
+        <Text>{TG_APPLY}</Text>
+      </Section>
+      </Fragment>}
+      {rs("5.10 Blood Type Compatibility Chart") && <Fragment>
+      <Section key={pr ? "p510" : "s510"} collapsible defaultOpen={pr} heading="5.10 Blood Type Compatibility Chart" caption="Source: 'BLOOD TYPE COMPATIBILITY CHART **' posted in the Schneck blood bank (photo). Header: Donor Can Be for..... Transcribed as printed. The text of the ** footnote is not in the photo.">
+        <Table columns={["Blood Type of Recipient", "Red Cells", "Whole Blood", "Plasma"]} rows={COMPAT} />
+      </Section>
+      </Fragment>}
+      {rs("5.11 Selection of components when ABO-identical donors are not available") && <Fragment>
+      <Section key={pr ? "p511" : "s511"} collapsible defaultOpen={pr} heading="5.11 Selection of components when ABO-identical donors are not available" caption="Source: label posted in the Schneck blood bank (photo). Transcribed as printed; every cell was legible.">
+        <Table columns={["Component", "ABO Requirements"]} rows={SELC} />
+        <Text>*If a large volume of plasma is administered, components compatible with the recipient's red cells are preferred.</Text>
+      </Section>
+      </Fragment>}
+      {rs("5.12 Cryo & Plasma Compatibility (Schneck substitution list)") && <Fragment>
+      <Section key={pr ? "p512" : "s512"} collapsible defaultOpen={pr} heading="5.12 Cryo & Plasma Compatibility (Schneck substitution list)" caption="Source: Schneck Medical Center blood bank posted sheet, 'Selection of units (substitution list)'. Transcribed by Alexis from the photo, as printed. Rows = recipient blood type; columns = donor blood type.">
+        <Text>Donor Cryo</Text>
+        <Table columns={["Recipient", "Donor O", "Donor A", "Donor B", "Donor AB"]} rows={CRYO} />
+        <Text>Table note 1. Assumes absence of strong atypical antibodies in donor cryoprecipitate. Y= best compatibility, although all types of cryoprecipitate are deemed compatible with any recipient blood type.</Text>
+        <Text>Plasma compatibility (blank = not listed on the sheet)</Text>
+        <Table columns={["Recipient", "Donor plasma O", "Donor plasma A", "Donor plasma B", "Donor plasma AB"]} rows={PLASMA} />
+        <Text>Table note 1. Assumes absence of strong atypical antibodies in donor plasma</Text>
+      </Section>
+      </Fragment>}
+      {rs("5.13 Ortho Antibody Index Chart") && <Fragment>
+      <Section key={pr ? "p513" : "s513"} collapsible defaultOpen={pr} heading="5.13 Ortho Antibody Index Chart" caption="Source: Ortho-Clinical Diagnostics (a Johnson & Johnson company), ANTIBODY INDEX CHART, © Ortho-Clinical Diagnostics 2002 (footer code read as BB9070, 12/02). Transcribed from the full-chart photo and close-ups, cross-checked row by row. Spelling as printed.">
+        <div style={{ overflowX: "auto", paddingRight: 8 }}>
+          <table style={{ borderCollapse: "collapse", width: "auto", tableLayout: "auto", fontFamily: t.font.family, fontSize: 11 }}>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b", position: "sticky", left: 0, zIndex: 2, textAlign: "left" }}>Antibody</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b" }}>ISBT</th>
+                <th colSpan={3} style={{ ...brHead, background: "#c2185b" }}>Common Reaction Mode</th>
+                <th colSpan={3} style={{ ...brHead, background: "#c2185b" }}>Column Agglutination Reaction</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b" }}>Natural (stimulus unknown)</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b" }}>Immune (Transfusion or Pregnancy)</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b" }}>Transfusion Reaction</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b" }}>HDN</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b" }}>Reactivity with Enzyme Treated RBC</th>
+                <th colSpan={2} style={{ ...brHead, background: "#c2185b" }}>% Blood Compatibility</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#c2185b", minWidth: 220 }}>Remarks</th>
+              </tr>
+              <tr>
+                {["RT", "37°C", "AHG", "Buffered Gel Card RT", "Buffered Gel Card 37°C", "IgG Card 37°C", "Caucasians", "African-Americans"].map((h: string) => <th key={h} style={{ ...brHead, background: "#c2185b" }}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {ORTHO.map(([sys, rows]) => (
+                <Fragment key={sys}>
+                  <tr><td colSpan={16} style={{ ...brCell, background: "#2b2b2b", color: "#fff", fontWeight: 700, textAlign: "left", whiteSpace: "nowrap" }}><span style={{ position: "sticky", left: 6 }}>Blood Group System: {sys}</span></td></tr>
+                  {rows.map((r: OR, j: number) => (
+                    <tr key={r[1] + r[0]}>
+                      <td style={{ ...brCell, fontWeight: 700, textAlign: "left", whiteSpace: "nowrap", position: "sticky", left: 0, zIndex: 1, background: t.bg.base }}>{r[0]}</td>
+                      <td style={{ ...brCell, whiteSpace: "nowrap" }}>{r[1]}</td>
+                      {r[2].split("").map((d: string, k: number) => <td key={k} title={OR_PH[k]} style={{ ...brCell, color: OR_DOT[k], fontSize: 14, lineHeight: 1 }}>{d === "1" ? "●" : ""}</td>)}
+                      {[r[3], r[4], r[5], r[6], r[7], r[8], r[9]].map((v: string, k: number) => <td key={k} style={{ ...brCell, whiteSpace: "nowrap" }}>{v}</td>)}
+                      {r[10] !== "^" && <td rowSpan={spanOf(rows, j, 10)} style={{ ...brCell, textAlign: "left", minWidth: 220 }}>{r[10]}</td>}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Text>Legend: <span style={{ color: OR_DOT[0], fontSize: 14 }}>●</span> RT · <span style={{ color: OR_DOT[1], fontSize: 14 }}>●</span> 37° C · <span style={{ color: OR_DOT[2], fontSize: 14 }}>●</span> AHG = Reaction occasionally or usually occurs at this stage. No Color = Reaction rarely or infrequently occurs at this stage. On the chart, Buffered Gel Card dots use the RT / 37° C colors and IgG Card 37°C dots use the AHG color.</Text>
+        <Text>On the chart the Leᵃ remark spans the Leᵃ and Leᵇ rows and the HTLA remark spans all seven HTLA rows; they are shown merged the same way here. Blank cells are blank on the chart.</Text>
+      </Section>
+      </Fragment>}
+      {rs("5.14 Grifols Human Blood Group Antigens & Antibodies") && <Fragment>
+      <Section key={pr ? "p514" : "s514"} collapsible defaultOpen={pr} heading="5.14 Grifols Human Blood Group Antigens & Antibodies" caption="Source: Grifols (Blood Typing Solutions), Human Blood Group Antigens & Antibodies poster. Transcribed as printed, including decimal commas and footnote marks; the Blood Group System and Antigen columns, footnotes and references were transcribed by Alexis from the poster photos. · = dot printed on the poster.">
+        <div style={{ overflowX: "auto", paddingRight: 8 }}>
+          <table style={{ borderCollapse: "collapse", width: "auto", tableLayout: "auto", fontFamily: t.font.family, fontSize: 11 }}>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ ...brHead, background: "#1d3a8a", position: "sticky", left: 0, zIndex: 2, textAlign: "left", width: 120, minWidth: 120, maxWidth: 120, boxSizing: "border-box" }}>Blood Group System</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#1d3a8a", position: "sticky", left: 120, zIndex: 2, textAlign: "left" }}>Antigen</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#1d3a8a" }}>ISBT Symbol</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#1d3a8a" }}>Gene(s)</th>
+                <th colSpan={3} style={{ ...brHead, background: "#1d3a8a" }}>Antigen Occurrence (%)</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#1d3a8a" }}>Antigen Density</th>
+                <th rowSpan={2} style={{ ...brHead, background: "#1d3a8a" }}>Immunoglobulin Class</th>
+                <th colSpan={4} style={{ ...brHead, background: "#1d3a8a" }}>Antibody Detection Technique</th>
+                <th colSpan={2} style={{ ...brHead, background: "#1d3a8a" }}>Clinical significance</th>
+              </tr>
+              <tr>
+                {["Caucasian", "Black", "Asian", "4°C - RT", "IAT", "Papain /Ficin†", "DTT 0.2M†", "HTR", "HDFN"].map((h: string) => <th key={h} style={{ ...brHead, background: "#1d3a8a" }}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {GRIF.map(([gene, rows]) => (
+                <Fragment key={gene}>
+                  {rows.map((r: GR, j: number) => (
+                    <tr key={r[0]}>
+                      {GRIF_SPAN[r[0]] !== undefined && <td rowSpan={GRIF_SPAN[r[0]]} style={{ ...brCell, fontWeight: 700, textAlign: "left", whiteSpace: "normal", position: "sticky", left: 0, zIndex: 1, background: t.bg.base, width: 120, minWidth: 120, maxWidth: 120, boxSizing: "border-box" }}>{GRIF_SYS(r[0])}</td>}
+                      <td style={{ ...brCell, fontWeight: 700, textAlign: "left", whiteSpace: "nowrap", position: "sticky", left: 120, zIndex: 1, background: t.bg.base }}>{GRIF_L[r[0]] ? GRIF_L[r[0]][1] : ""}</td>
+                      <td style={{ ...brCell, whiteSpace: "nowrap" }}>{r[0]}</td>
+                      {j === 0 && <td rowSpan={rows.length} style={{ ...brCell, whiteSpace: "nowrap" }}>{gene}</td>}
+                      {r.slice(1).map((v: string, k: number) => <td key={k} style={{ ...brCell, whiteSpace: "nowrap", background: GR_BG[k + 1] }}>{v}</td>)}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Text>Color code: the poster colors antigens red (high prevalence), blue (polymorphic) or green (low prevalence). Per-antigen color coding not transcribed; see original poster.</Text>
+        <Text>Footnotes</Text>
+        {GRIF_FOOT.map((f: string) => <Text key={f}>{f}</Text>)}
+        <Text>References</Text>
+        {GRIF_REFS.map((f: string) => <Text key={f}>{f}</Text>)}
       </Section>
       </Fragment>}
       </Section>
