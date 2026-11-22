@@ -14,6 +14,8 @@ const SCH_N = 1; // "Only one needed"
 
 interface Lot { lot: string; exp: string; donors: string[]; rh: string[]; cells: string[]; other: string[]; brand?: string; product?: string; }
 const LOTS: Lot[] = [
+  { lot:"6100 26023", exp:"2026-12-19", donors:["M9259AM","M8229HM","M9398LS","M8268AM","M6061AM","M8581AM","M8155LS","M8964AM","M9260LS","M5049AM","M0460CC"], rh:["rr","rr","r'r","r''r","rr","R0r","R1R1","R1R1","R1wR1","R2R2","R1r"],
+    cells:["0001100101001101001101","0001101100101100110101","0101100100111111110101","0011100100101111101000","0001100100110010110001","1001100100010111100001","1100100110110111010001","1100101100101010110110","1100110101010010101101","1011000101111011110101","1101101101101111000111"], other:["","Co(b+)","","","","","","Lu(b-)","","","Co(b+), Wr(a+)"] },
   { lot:"6100 26021", exp:"2026-11-21", donors:["M4438CC","M8269AM","M8566AM","M9111LS","M7331CC","M8991AM","M8271AM","M8867AM","M9161AM","M7998AM","M6631CC"], rh:["rr","rr","r'r","r''r","rr","R0r","R1R1","R1R1","R1wR1","R2R2","rr"],
     cells:["0001100111110110101010","0001101100101010100001","0101100100101010100001","0011100101111101010101","0001100101010011101101","1001100100010010001101","1100100100101110110001","1100101101111101001101","1100110101010110101100","1011000101001010110000","0001100101101010101111"], other:["","","","Co(b+)","Co(b+)","U(-)","","","","",""] },
   { lot:"6100 26019", exp:"2026-10-24", donors:["M9004CC","M8429LS","M8967LS","M8118LS","M5530CC","M8956HM","M9073AM","M4266AM","M5757AM","M8135AM","M0460CC"], rh:["rr","rr","r'r","r''r","rr","R0r","R1R1","R1R1","R1wR1","R2R2","R1r"],
@@ -28,6 +30,7 @@ const LOTS: Lot[] = [
     cells:["0001100101001101001100","0001101001011101110101","0101100101110100100101","0011100100101010101101","0001100110110101101001","1001100100010110101100","1100100100101011010001","1100101100101111101100","1100110101111110101101","1011000100111010101110","1111000101011100101101"], other:["","","P1 printed +w","","","Js(a+)","","P1 printed +vw","","Lu(b-)","C printed +w"] },
 ];
 const SCREENS: Lot[] = [
+{lot:"6435 26023",exp:"2026-12-19",donors:["M9393CC","M4870HO"],rh:["R1R1","R2R2"],cells:["1100100100101110101000","1011001101010101010101"],other:["Co(b+)",""]},
 {lot:"6435 26021",exp:"2026-11-21",donors:["M8169HM","M9291AM"],rh:["R1R1","R2R2"],cells:["1100100100110101010101","1011001101001110101001"],other:["Co(b+)",""]},
 {lot:"6435 26017",exp:"2026-09-26",donors:["M8169HM","M7374LS"],rh:["R1R1","R2R2"],cells:["1100100100110101010101","1011001101001111101011"],other:["Co(b+)",""]},
 {lot:"6435 26015",exp:"2026-08-29",donors:["M8169HM","M7374LS"],rh:["R1R1","R2R2"],cells:["1100100100110101010101","1011001101001111101011"],other:["Co(b+)",""]},
@@ -58,11 +61,15 @@ const SCREENS: Lot[] = [
 {lot:"6435 24015",exp:"2024-08-31",donors:["M5589AM","M7806AM"],rh:["R1R1","R2R2"],cells:["1100101100101110110101","1011000101010101001101"],other:["P1 printed +vw","P1 printed +w"]},
 {lot:"6435 24007",exp:"2024-05-11",donors:["M5589AM","M7175AM"],rh:["R1R1","R2R2"],cells:["1100101100101110110101","1011001101010011001101"],other:["P1 printed +vw",""]}
 ];
-const TODAY = "2026-10-31";
+// Expiry is checked against the viewer's current local calendar date (YYYY-MM-DD). A lot is expired only after its expiration date: exp < TODAY.
+const localISO = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const TODAY: string = localISO(new Date());
 // Brand/product per lot; add another manufacturer's lots with their own brand and product.
 const B_SCREENS: Lot[] = SCREENS.map((l: Lot) => ({ ...l, brand: "Grifols", product: "Search-Cyte Plus 0.8%" }));
 const B_LOTS: Lot[] = LOTS.map((l: Lot) => ({ ...l, brand: "Grifols", product: "Data-Cyte Plus" }));
 const BRANDS: string[] = Array.from(new Set([...B_SCREENS, ...B_LOTS].map((l: Lot) => l.brand as string)));
+// Default lot: the first (newest) non-expired lot of the default manufacturer; falls back to the first lot if all are expired.
+const firstCurrent = (src: Lot[]): string => { const i = src.findIndex((l: Lot) => l.brand === BRANDS[0] && l.exp >= TODAY); return String(i >= 0 ? i : 0); };
 const GRADES = ["", "0", "w", "1+", "2+", "3+", "4+", "nt"];
 const PHASES = ["", "IS", "37", "AHG"];
 const GROUPS: { name: string; n: number; bold?: boolean }[] = [{ name: "Rh", n: 6 }, { name: "Kell", n: 3 }, { name: "Duffy", n: 2, bold: true }, { name: "Kidd", n: 2 }, { name: "MNS", n: 4, bold: true }, { name: "Lewis", n: 2 }, { name: "P1PK", n: 1 }, { name: "Luth.", n: 1 }, { name: "Xg", n: 1, bold: true }];
@@ -584,10 +591,20 @@ const zeros = (): string[] => Array.from({ length: NR }, () => "0");
 const num = (s: string | null): number | null => { if (s === null) return null; if (!/^[<>]?\d+(\.\d+)?$/.test(s)) return null; return parseFloat(s.replace(/[<>]/g, "")); };
 const cellName = (scr: boolean, i: number): string => (scr ? (i === 0 ? "I" : "II") : String(i + 1));
 
+// Bench color key. Tinted backgrounds with neutral ink stay readable in light and dark mode.
+const CK: Record<string, { b: string; bg: string; label: string }> = {
+  ok: { b: "#1e8e3e", bg: "rgba(30, 142, 62, 0.18)", label: "Ruled out · met · OK" },
+  warn: { b: "#d98a00", bg: "rgba(230, 150, 0, 0.22)", label: "Remaining · needs attention" },
+  bad: { b: "#d93025", bg: "rgba(217, 48, 37, 0.18)", label: "Positive · STOP · expired" },
+  neg: { b: "#3884ff", bg: "rgba(56, 132, 255, 0.22)", label: "Negative cell" },
+  na: { b: "#8a8f98", bg: "rgba(138, 143, 152, 0.20)", label: "Not counted · off · N/A" },
+  ed: { b: "#8e24aa", bg: "rgba(142, 36, 170, 0.22)", label: "Edited cell (changed from original antigram)" },
+};
+const NAVY = "#1d3a8a";
 export default function App() {
   const t = useGrokTheme();
-  const [pLot, setPLot] = useState<string>("0");
-  const [sLot, setSLot] = useState<string>("0");
+  const [pLot, setPLot] = useState<string>(firstCurrent(B_LOTS));
+  const [sLot, setSLot] = useState<string>(firstCurrent(B_SCREENS));
   const [calcSel, setCalcSel] = useState<string[]>([]);
   const [calcAuto, setCalcAuto] = useState<boolean>(true);
   const [xOn, setXOn] = useState<boolean>(false);
@@ -603,7 +620,7 @@ export default function App() {
   const [het, setHet] = useState<boolean>(false);
   const [schneck, setSchneck] = useState<boolean>(true);
   const [antiD, setAntiD] = useState<boolean>(false);
-  const [inclSC, setInclSC] = useState<boolean>(true);
+  const [inclSC, setInclSC] = useState<boolean>(false);
   const [rule2, setRule2] = useState<boolean>(false);
   const [txRecent, setTxRecent] = useState<boolean>(false);
   const [datPos, setDatPos] = useState<boolean>(false);
@@ -613,6 +630,9 @@ export default function App() {
   const [xOut, setXOut] = useState<boolean>(true);
   const [hlPos, setHlPos] = useState<boolean>(true);
   const [hlNeg, setHlNeg] = useState<boolean>(false);
+  const [setupOpen, setSetupOpen] = useState<boolean>(false);
+  const [infoOpen, setInfoOpen] = useState<boolean>(false);
+  const [det, setDet] = useState<Record<string, boolean>>({});
   const PL = LOTS[Math.min(Number(pLot), LOTS.length - 1)];
   const SL = SCREENS[Math.min(Number(sLot), SCREENS.length - 1)];
   const XL = LOTS[Math.min(Number(xLot), LOTS.length - 1)];
@@ -633,6 +653,9 @@ export default function App() {
     const ch = L.cells[ci][ai];
     return ch === "1" ? "+" : ch === "0" ? "0" : "?";
   };
+  const orig = (ci: number, ai: number): string => { const ch = L.cells[ci][ai]; return ch === "1" ? "+" : ch === "0" ? "0" : "?"; };
+  const isEdited = (ci: number, ai: number): boolean => edits[`${LK(ci)}|${ci}|${ai}`] !== undefined && edits[`${LK(ci)}|${ci}|${ai}`] !== orig(ci, ai);
+  const editedN = Array.from({ length: N }, (_v: unknown, ci: number) => AG.filter((_a: string, ai: number) => isEdited(ci, ai)).length).reduce((p: number, x: number) => p + x, 0);
   const cycle = (ci: number, ai: number): void => {
     const cur = val(ci, ai);
     const next = cur === "+" ? "0" : cur === "0" ? "?" : "+";
@@ -690,10 +713,10 @@ export default function App() {
   const brHead: CSSProperties = { padding: "4px 5px", color: "#fff", fontWeight: 600, fontSize: 11, border: "1px solid rgba(255,255,255,0.6)", textAlign: "center", verticalAlign: "bottom", whiteSpace: "normal", wordBreak: "keep-all", overflowWrap: "normal", hyphens: "none" };
   const brCell: CSSProperties = { padding: "4px 5px", border: "1px solid rgba(138, 36, 72, 0.35)", textAlign: "center", verticalAlign: "middle", color: t.text.primary, fontSize: 11, wordBreak: "keep-all", overflowWrap: "normal" };
   const brFill = (c?: string): CSSProperties => (c ? { background: c, color: BR_DARK.has(c) ? "#fff" : "#222" } : {});
-  const sel: CSSProperties = { background: t.bg.base, color: t.text.primary, border: `1px solid ${t.border.default}`, borderRadius: 4, padding: "4px 2px", minHeight: 32, fontSize: t.font.table.fontSize, width: "auto", minWidth: 0, appearance: "none", WebkitAppearance: "none", textAlign: "center", textAlignLast: "center", cursor: "pointer" };
+  const sel: CSSProperties = { background: t.bg.base, color: t.text.primary, border: `1px solid ${t.border.default}`, borderRadius: 4, padding: "4px 2px", minHeight: 40, fontSize: 14, width: "auto", minWidth: 0, appearance: "none", WebkitAppearance: "none", textAlign: "center", textAlignLast: "center", cursor: "pointer" };
   const fix = (w: number): CSSProperties => ({ width: w, minWidth: w, maxWidth: w, boxSizing: "border-box", whiteSpace: "nowrap", borderLeft: "none", borderRight: "none", boxShadow: "none", padding: "6px 2px" });
-  const ctl: CSSProperties = { ...cell, ...fix(40) };
-  const ctlPh: CSSProperties = { ...cell, ...fix(50) };
+  const ctl: CSSProperties = { ...cell, ...fix(46) };
+  const ctlPh: CSSProperties = { ...cell, ...fix(54) };
   const endCell: CSSProperties = { ...cell, whiteSpace: "nowrap", padding: "6px 8px 6px 4px", fontWeight: t.weight.semibold };
   const BOLD = `4px solid ${t.text.primary}`;
   const HL = "rgba(229, 72, 95, 0.30)";
@@ -736,13 +759,13 @@ export default function App() {
   const rhCount = calcUsed.filter((a: string) => ["D", "C", "E", "c", "e"].includes(a)).length;
   const RED = "#e0301e";
   const ruledSet = new Set(analysis.ruled.map((r) => r.ag));
-  const SLASH = `linear-gradient(to top right, transparent calc(50% - 1.5px), ${RED} calc(50% - 1.5px), ${RED} calc(50% + 1.5px), transparent calc(50% + 1.5px))`;
+  const SLASH = `linear-gradient(to top right, transparent calc(50% - 1.5px), ${CK.ok.b} calc(50% - 1.5px), ${CK.ok.b} calc(50% + 1.5px), transparent calc(50% + 1.5px))`;
   const NEGHL = "rgba(56, 132, 255, 0.22)";
   const negSet = new Set(analysis.neg);
-  const rowBg = (ci: number): string | null => (hlPos && rowR(ci) ? HL : hlNeg && negSet.has(ci) ? NEGHL : null);
-  const agBg = (ai: number): CSSProperties => ({ background: xOut && ruledSet.has(AG[ai]) ? `${SLASH}, ${YEL}` : YEL });
+  const rowBg = (ci: number): string | null => (ci < NS && !inclSC ? CK.na.bg : hlPos && rowR(ci) ? HL : hlNeg && negSet.has(ci) ? NEGHL : null);
+  const agBg = (ai: number): CSSProperties => ({ background: xOut && ruledSet.has(AG[ai]) ? `${SLASH}, ${CK.ok.bg}` : xOut && analysis.tested > 0 ? CK.warn.bg : YEL });
   const gStart = GROUPS.map((_g, i) => GROUPS.slice(0, i).reduce((s, x) => s + x.n, 0));
-  const grpBg = (gi: number): CSSProperties => ({ background: AG.slice(gStart[gi], gStart[gi] + GROUPS[gi].n).every((a) => ruledSet.has(a)) && xOut ? `linear-gradient(${RED}, ${RED}) center / 80% 3px no-repeat, ${YEL}` : YEL });
+  const grpBg = (gi: number): CSSProperties => ({ background: AG.slice(gStart[gi], gStart[gi] + GROUPS[gi].n).every((a) => ruledSet.has(a)) && xOut ? `linear-gradient(${CK.ok.b}, ${CK.ok.b}) center / 80% 3px no-repeat, ${CK.ok.bg}` : YEL });
   const anyEntered = analysis.tested > 0;
   const matching = analysis.cands.filter((c) => c.match);
   const [pr, setPr] = useState<boolean>(false);
@@ -753,52 +776,111 @@ export default function App() {
     window.addEventListener("afterprint", off);
     return () => { window.removeEventListener("beforeprint", on); window.removeEventListener("afterprint", off); };
   }, []);
+  const pill = (k: string, content: string, big?: boolean) => <span key={k + content} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: big ? "5px 12px" : "2px 9px", borderRadius: 999, border: `1.5px solid ${CK[k].b}`, background: CK[k].bg, color: t.text.primary, fontSize: big ? 14 : 11, fontWeight: 600, lineHeight: 1.3 }}><span style={{ width: big ? 10 : 7, height: big ? 10 : 7, borderRadius: 999, background: CK[k].b, flex: "none" }}></span>{content}</span>;
+  const chip = (k: string, content: string) => <span key={k + content} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "2px 8px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.12)", color: "#fff", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}><span style={{ width: 7, height: 7, borderRadius: 999, background: CK[k].b, flex: "none" }}></span>{content}</span>;
+  const bandS = (k: string): CSSProperties => ({ borderLeft: `5px solid ${CK[k].b}`, background: CK[k].bg, borderRadius: 6, padding: "4px 10px" });
+  const acReactive = [acIS, ac37, ac].some(isReactive);
+  const histOn = txRecent || datPos;
+  const dt = (id: string, body: any) => (pr || det[id]) ? <Fragment>{body}<span className="noprint" role="button" onClick={() => setDet({ ...det, [id]: false })} style={{ marginLeft: 6, fontSize: 11, textDecoration: "underline", cursor: "pointer", opacity: 0.8, whiteSpace: "nowrap" }}>Hide details</span></Fragment> : <span className="noprint" role="button" onClick={() => setDet({ ...det, [id]: true })} style={{ fontSize: 11, textDecoration: "underline", cursor: "pointer", opacity: 0.8, whiteSpace: "nowrap" }}>Show details ▸</span>;
+  const confMet = (c: { posPos: number; negNeg: number }): boolean => c.posPos >= minPos && c.negNeg >= minNeg;
+  const setBox: CSSProperties = { border: `1px solid ${t.border.default}`, borderRadius: 6, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4, minWidth: 0 };
+  const setDesc: CSSProperties = { fontSize: 11, color: t.text.secondary, lineHeight: 1.35 };
+  const setGrid: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8, alignItems: "stretch" };
+  const grpLbl: CSSProperties = { fontSize: 12, fontWeight: 600, color: "#1d3a8a", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 4 };
+  const acState = !anyEntered ? "Not entered" : [acIS, ac37, ac].some(isReactive) ? "Positive" : [acIS, ac37, ac].some((g: string) => g === "0") ? "Negative" : "Not entered";
   const doPrint = () => { setPr(true); setTimeout(() => { try { window.print(); } catch (e) { setPr(false); } }, 300); };
   const PRINT_CSS = ".printonly{display:none}@page{size:landscape;margin:0.4in}@media print{html,body{background:#fff !important;color:#000 !important}*{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}.noprint,button{display:none !important}.printonly{display:block !important}div{overflow:visible !important;max-height:none !important}th,td{position:static !important}table{font-size:9px !important}th,td{padding:2px 3px !important}tr{break-inside:avoid;page-break-inside:avoid}thead{display:table-header-group}h1,h2,h3{break-after:avoid}}";
 
   return (
-    <Page title="Antibody Rule-Out Tool: Bells and Whistles for Schneck" width="wide" summary="Antibody Identification Worksheet · Grifols Search-Cyte Plus 0.8% screen cells and Data-Cyte Plus panel cells, with Schneck Medical Center Ab ID rules on by default. Pick the screen and panel lots, grade each cell, and see which antibodies are ruled out, which remain, whether the validation rule is met, and how many units to screen.">
+    <Page title="Antibody Rule-Out Tool: Bells and Whistles for Schneck" width="wide" summary="Antibody rule-out worksheet with Schneck rules.">
       <style>{PRINT_CSS}</style>
       <div className="printonly" style={{ fontSize: 11 }}>Antibody Rule-Out Tool: Bells and Whistles for Schneck · Printed {new Date().toLocaleString()} · Screen lot {SL.lot} (exp {SL.exp}) · Panel lot {PL.lot} (exp {PL.exp}){xOn ? ` · Additional expired panel ${XL.lot} (exp ${XL.exp})` : ""} · Schneck rules {schneck ? "on" : "off"} · Anti-D detected {schneck && antiD ? "on" : "off"} · Heterozygous rule-outs {schneck ? "n/a (Schneck rules on)" : het ? "on" : "off"} · Auto cross-outs {xOut ? "on" : "off"} · Screen cells in cross-outs {inclSC ? "on" : "off"} · Confirmation {schneck && rule2 ? "Rule of Two (2+/2−)" : "Rule of Three (3+/3−)"} · Transfused in last 3 months {txRecent ? "yes" : "not marked"} · Positive IgG DAT {datPos ? "yes" : "not marked"}</div>
-      <div className="noprint" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+      <div className="noprint" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        <Button label="Load example (anti-Fyᵃ)" onClick={loadExample} />
+        <Button label="Reset reactions" onClick={reset} />
         <Button label="Print worksheet" variant="primary" onClick={doPrint} />
-        <span style={{ fontSize: 12, color: t.text.secondary }}>Prints landscape with all Reference sections expanded. If nothing happens, use your browser's Print (Ctrl/Cmd+P).</span>
+        <Button label={infoOpen ? "Hide info ▾" : "Show info ▸"} onClick={() => setInfoOpen(!infoOpen)} />
       </div>
-      <Callout tone="warning" lead="Bench aid only.">Antigrams were transcribed from phone photos. Always verify against the printed antigram for the lot in use and follow your SOP. Click any antigen cell to correct it (+ → 0 → ?); corrections are not saved. Cells marked ? are unreadable in the photo and never used for rule-outs. ⚠ marks handwritten pen marks on the source sheet.</Callout>
-      <Section heading="1. Specimen and reagent lot selection" caption="Screen: Search-Cyte Plus 0.8% (2-cell). Panel: Data-Cyte Plus (11-cell). Additional expired panel is optional and off by default. Schneck rules are on by default.">
+      {(infoOpen || pr) && <div style={{ border: `1px solid ${t.border.default}`, borderRadius: 8, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: t.text.secondary }}>
+        <span>Antibody Identification Worksheet · Grifols Search-Cyte Plus 0.8% screen cells and Data-Cyte Plus panel cells, with Schneck Medical Center Ab ID rules on by default. Pick the screen and panel lots, grade each cell, and see which antibodies are ruled out, which remain, whether the validation rule is met, and how many units to screen.</span>
+        <span className="noprint">Prints landscape with all Reference sections expanded. If nothing happens, use your browser's Print (Ctrl/Cmd+P).</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          <span style={{ fontSize: 11, color: t.text.secondary, fontWeight: 600 }}>Color key:</span>
+          {["ok", "warn", "bad", "neg", "na", "ed"].map((k: string) => pill(k, CK[k].label))}
+        </div>
+      </div>}
+      <div style={{ position: "sticky", top: 0, zIndex: 20, background: t.bg.base, border: `2px solid ${NAVY}`, borderRadius: 8, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: t.text.primary, textTransform: "uppercase", letterSpacing: 0.4 }}>Live result</span>
+          {!anyEntered && pill("na", "Enter reactions in the antigram below", true)}
+          {histOn && pill("bad", "STOP: no routine serologic phenotyping", true)}
+          {anyEntered && acReactive && pill("bad", "Autocontrol positive: perform DAT", true)}
+          {anyEntered && schneck && analysis.extraPos.length > 0 && pill("bad", `Unexplained reactive cell(s): ${analysis.extraPos.join(", ")}`, true)}
+          {anyEntered && pill("ok", `Ruled out: ${analysis.ruled.length}`, true)}
+          {anyEntered && pill(analysis.cands.length ? "warn" : "ok", `Remaining: ${analysis.cands.length}`, true)}
+          {anyEntered && matching.map((c) => pill(confMet(c) ? "ok" : "warn", `anti-${LABEL[c.ag]}: ${vRule} ${confMet(c) ? "met" : "not met"} (${c.posPos}+/${c.negNeg}−)`, true))}
+          {anyEntered && !matching.length && analysis.pos.length > 0 && pill("warn", "No single antibody explains all reactive cells", true)}
+          {anyEntered && analysis.pos.length === 0 && pill("na", "No reactive cells", true)}
+        </div>
+        {anyEntered && analysis.cands.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: t.text.secondary, marginRight: 2 }}>REMAINING</span>
+          {analysis.cands.map((c) => pill("warn", `anti-${LABEL[c.ag]}${c.lfa ? " (low-frequency)" : ""}`))}
+        </div>}
+        {anyEntered && analysis.ruled.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: t.text.secondary, marginRight: 2 }}>RULED OUT</span>
+          {analysis.ruled.map((r) => pill("ok", `anti-${LABEL[r.ag]}`))}
+        </div>}
+      </div>
+      <div style={{ ...bandS(histOn ? "bad" : "na"), padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+          <span style={{ fontWeight: 700, fontSize: 13, color: t.text.primary }}>Patient history</span>
+          <Toggle label="Transfused in the last 3 months" value={txRecent} onChange={setTxRecent} />
+          <Toggle label="Positive IgG DAT" value={datPos} onChange={setDatPos} />
+        </div>
+        <details open={pr ? true : undefined}><summary style={{ cursor: "pointer", fontSize: 12, color: t.text.secondary, fontWeight: 600 }}>History checklist (Tech Guide section 1)</summary>
+          <Rows rows={[
+            { title: "Review patient history", detail: "Verify transfusion and pregnancy history (past 3 months), diagnosis, and past Ab/phenotype records." },
+            { title: "Autocontrol / DAT negative", detail: "Suggests alloantibody." },
+            { title: "Autocontrol / DAT positive", detail: "Indicates possible autoantibody, drug-induced reactivity, or alloantibody on recently transfused donor cells. Perform DAT." },
+          ]} />
+        </details>
+      </div>
+      <div style={{ border: `1px solid ${t.border.default}`, borderRadius: 8, overflow: "hidden" }}>
+        <div role="button" onClick={() => setSetupOpen(!setupOpen)} style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", padding: "8px 12px", cursor: "pointer", background: NAVY, color: "#fff" }}>
+          <span style={{ fontWeight: 700, fontSize: 13, marginRight: 6 }}>{setupOpen || pr ? "▾" : "▸"} Setup</span>
+          {chip(SL.exp < TODAY ? "bad" : "ok", `Screen ${SL.lot}${SL.exp < TODAY ? " EXPIRED" : ""}`)}
+          {chip(PL.exp < TODAY ? "bad" : "ok", `Panel ${PL.lot}${PL.exp < TODAY ? " EXPIRED" : ""}`)}
+          {xOn && chip("bad", `+ expired panel ${XL.lot}`)}
+          {chip(schneck ? "ok" : "na", `Schneck rules ${schneck ? "on" : "off"}`)}
+          {schneck && antiD && chip("warn", "Anti-D detected")}
+          {chip(inclSC ? "ok" : "na", inclSC ? "Screen cells counted" : "Screen cells NOT counted")}
+          {chip(schneck && rule2 ? "warn" : "ok", schneck && rule2 ? "Rule of Two (2+/2−)" : "Rule of Three (3+/3−)")}
+          {!schneck && chip(het ? "warn" : "na", `Heterozygous rule-outs ${het ? "on" : "off"}`)}
+          {chip(xOut ? "ok" : "na", `Cross-outs ${xOut ? "on" : "off"}`)}
+          <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.9 }}>{setupOpen ? "Hide setup" : "Change lots or settings"}</span>
+        </div>
+        {(setupOpen || pr) && <div style={{ padding: "4px 12px 10px", display: "flex", flexDirection: "column", gap: 8 }}>
+      <Section heading="Reagent lots and settings" caption="Screen: Search-Cyte Plus 0.8% (2-cell). Panel: Data-Cyte Plus (11-cell). Additional expired panel is optional and off by default. Schneck rules are on by default.">
+        <div style={grpLbl}>Reagent lots</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
           <Select label="Manufacturer" options={BRANDS} value={brand} onChange={(v: string) => setBrand(v)} />
           <Select label="Screen lot (Search-Cyte Plus 0.8%)" options={lotOpts(B_SCREENS)} value={sLot} onChange={(v: string) => { setSLot(v); clearRows(0, NS); }} />
           <Select label="Panel lot (Data-Cyte Plus)" options={lotOpts(B_LOTS)} value={pLot} onChange={(v: string) => { setPLot(v); clearRows(NS, NP); }} />
           <Toggle label="Add an additional panel (expired lots)" value={xOn} onChange={(v: boolean) => { setXOn(v); clearRows(NP, NR); }} />
           {xOn && <Select label="Additional panel lot (expired)" options={EXPIRED_IDX.filter((i: number) => B_LOTS[i].brand === brand).map((i: number) => ({ value: String(i), label: `${B_LOTS[i].brand} ${B_LOTS[i].product} ${B_LOTS[i].lot}, EXPIRED ${B_LOTS[i].exp}` }))} value={xLot} onChange={(v: string) => { setXLot(v); clearRows(NP, NR); }} />}
-          <Toggle label="Allow heterozygous rule-outs (Rh, Kidd, Duffy, MNS)" value={het} onChange={setHet} disabled={schneck} />
-          <Toggle label="Schneck rules" value={schneck} onChange={setSchneck} />
-          {schneck && <Toggle label="Anti-D detected" value={antiD} onChange={setAntiD} />}
-          <Toggle label="Include screen cells in cross-outs" value={inclSC} onChange={setInclSC} />
-          {schneck && <Toggle label="Rule of Two (2+/2−): only for low-frequency antibodies (e.g., Cʷ, Kpᵃ) or selected cells in complex multi-antibody cases per medical director validation" value={rule2} onChange={setRule2} />}
-          <Button label="Load example (anti-Fyᵃ)" onClick={loadExample} />
-          <Button label="Reset" variant="primary" onClick={reset} />
         </div>
-      </Section>
-      {schneck && <Callout tone="info" lead="Schneck Tech Guide (11/2026) rules active.">{`Only one nonreactive panel cell (negative across all phases) is needed to cross out an antigen. Double-dose required: C (C+c−), c (C−c+), E (E+e−), e (E−e+), Fyᵃ (Fy(a+b−)), Fyᵇ (Fy(a−b+)), Jkᵃ (Jk(a+b−)), Jkᵇ (Jk(a−b+)), M (M+N−), N (M−N+), S (S+s−), s (S−s+); single-dose cells do not rule these out. Single-dose permitted: D, K, P₁, Xgᵃ, Leᵃ, Leᵇ, Luᵃ (Luᵇ is in the guide but is not an antigram column). ${antiD ? "Anti-D detected is on: 1 nonreactive D− C+c+ cell rules out C and 1 nonreactive D− E+e+ cell rules out E." : "Anti-D detected is off."} Antigram antigens the guide does not list: k needs 1 double-dose K−k+ cell; Cʷ and Kpᵃ need 1 antigen-positive cell (no partner on the antigram). Low-frequency V, Cʷ, Kpᵃ, Jsᵃ, Luᵃ may be omitted during the initial exclusion: they are tagged and left out of units to screen. Confirming specificity (not rule-out): Rule of Three, 3 antigen-positive reactive and 3 antigen-negative nonreactive cells (p ≤ 0.05); Rule of Two (2+/2−) only with the option above. The heterozygous toggle is ignored while Schneck rules are on.`}</Callout>}
-      {!inclSC && <Text>Screen cells SC I and SC II are still shown in section 2 but are not counted for rule-outs, antibodies not excluded, units to screen, or the 3+/3− (or 2+/2−) counts.</Text>}
-      <Section heading="Initial evaluation and autocontrol (Tech Guide section 1)" caption="Schneck Blood Bank Tech Guide: Antibody Identification (11/2026). Checklist reminders; the two switches drive the patient antigen typing reminder in section 3.">
-        <Rows rows={[
-          { title: "Review patient history", detail: "Verify transfusion and pregnancy history (past 3 months), diagnosis, and past Ab/phenotype records." },
-          { title: "Autocontrol / DAT negative", detail: "Suggests alloantibody." },
-          { title: "Autocontrol / DAT positive", detail: "Indicates possible autoantibody, drug-induced reactivity, or alloantibody on recently transfused donor cells. Perform DAT." },
-        ]} />
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
-          <Toggle label="Transfused in the last 3 months" value={txRecent} onChange={setTxRecent} />
-          <Toggle label="Positive IgG DAT" value={datPos} onChange={setDatPos} />
+        <div style={grpLbl}>Rule settings</div>
+        <div style={setGrid}>
+          <div style={setBox}><Toggle label="Schneck rules" value={schneck} onChange={setSchneck} /><span style={setDesc}>Uses the Schneck Tech Guide (11/2026) rule-out criteria. On by default.</span></div>
+          {schneck && <div style={setBox}><Toggle label="Anti-D detected" value={antiD} onChange={setAntiD} /><span style={setDesc}>When on, 1 nonreactive D− C+c+ cell rules out C and 1 nonreactive D− E+e+ cell rules out E.</span></div>}
+          {schneck && <div style={setBox}><Toggle label="Rule of Two (2+/2−): only for low-frequency antibodies (e.g., Cʷ, Kpᵃ) or selected cells in complex multi-antibody cases per medical director validation" value={rule2} onChange={setRule2} /><span style={setDesc}>Off = Rule of Three (3+/3−). Off by default.</span></div>}
+          <div style={setBox}><Toggle label="Allow heterozygous rule-outs (Rh, Kidd, Duffy, MNS)" value={het} onChange={setHet} disabled={schneck} /><span style={setDesc}>Ignored while Schneck rules are on. Off by default.</span></div>
         </div>
-      </Section>
-      <Section heading="Display options" caption="Display only; rule-out logic and interpretation are unaffected.">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
-          <Toggle label="Auto cross-outs" value={xOut} onChange={setXOut} />
-          <Toggle label="Highlight positive rows" value={hlPos} onChange={setHlPos} />
-          <Toggle label="Highlight negative rows" value={hlNeg} onChange={setHlNeg} />
+        <div style={grpLbl}>Display options</div>
+        <div style={setGrid}>
+          <div style={setBox}><Toggle label="Auto cross-outs" value={xOut} onChange={setXOut} /><span style={setDesc}>Display only; rule-out logic and interpretation are unaffected.</span></div>
+          <div style={setBox}><Toggle label="Highlight positive rows" value={hlPos} onChange={setHlPos} /><span style={setDesc}>Display only.</span></div>
+          <div style={setBox}><Toggle label="Highlight negative rows" value={hlNeg} onChange={setHlNeg} /><span style={setDesc}>Display only.</span></div>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", fontSize: 12, color: t.text.secondary }}>
           <span><span style={{ display: "inline-block", width: 14, height: 14, verticalAlign: "middle", marginRight: 6, background: HL, border: `1px solid ${t.border.default}` }}></span>Reactive (positive) row</span>
@@ -806,14 +888,28 @@ export default function App() {
         </div>
         {hlNeg && <Text>Nonreactive means at least one phase entered and every entered phase 0. AHG defaults to 0, so every row counts as nonreactive on load.</Text>}
       </Section>
-      {xOn && <Callout tone="warning" lead={`Additional panel lot ${XL.lot} expired ${XL.exp}.`}>Rows X1–X11 use expired reagent cells. Follow your facility policy for using expired reagents to complete rule-outs.</Callout>}
-      <Section heading={`2. Antibody screen and panel results: screen lot ${SL.lot}${SL.exp < TODAY ? " (EXPIRED)" : ""} + panel lot ${PL.lot}${PL.exp < TODAY ? " (EXPIRED)" : ""}`} caption="SC I and SC II are the screen cells; 1–11 are the panel. + positive, 0 negative, ? unreadable. Result blank = not tested.">
+        <details open={pr ? true : undefined}><summary style={{ cursor: "pointer", fontSize: 12, color: t.text.secondary, fontWeight: 600 }}>Rule details (Schneck Tech Guide 11/2026)</summary>
+      {schneck && <Callout tone="info" lead="Schneck Tech Guide (11/2026) rules active.">{dt("rules", `Only one nonreactive panel cell (negative across all phases) is needed to cross out an antigen. Double-dose required: C (C+c−), c (C−c+), E (E+e−), e (E−e+), Fyᵃ (Fy(a+b−)), Fyᵇ (Fy(a−b+)), Jkᵃ (Jk(a+b−)), Jkᵇ (Jk(a−b+)), M (M+N−), N (M−N+), S (S+s−), s (S−s+); single-dose cells do not rule these out. Single-dose permitted: D, K, P₁, Xgᵃ, Leᵃ, Leᵇ, Luᵃ (Luᵇ is in the guide but is not an antigram column). ${antiD ? "Anti-D detected is on: 1 nonreactive D− C+c+ cell rules out C and 1 nonreactive D− E+e+ cell rules out E." : "Anti-D detected is off."} Antigram antigens the guide does not list: k needs 1 double-dose K−k+ cell; Cʷ and Kpᵃ need 1 antigen-positive cell (no partner on the antigram). Low-frequency V, Cʷ, Kpᵃ, Jsᵃ, Luᵃ may be omitted during the initial exclusion: they are tagged and left out of units to screen. Confirming specificity (not rule-out): Rule of Three, 3 antigen-positive reactive and 3 antigen-negative nonreactive cells (p ≤ 0.05); Rule of Two (2+/2−) only with the option above. The heterozygous toggle is ignored while Schneck rules are on.`)}</Callout>}
+        </details>
+        </div>}
+      </div>
+      {xOn && <Callout tone="warning" lead={`Additional panel lot ${XL.lot} expired ${XL.exp}.`}>{dt("exp", "Rows X1–X11 use expired reagent cells. Follow your facility policy for using expired reagents to complete rule-outs.")}</Callout>}
+      <div id="bw-s3"><Section heading={`Enter reactions: screen lot ${SL.lot}${SL.exp < TODAY ? " (EXPIRED)" : ""} + panel lot ${PL.lot}${PL.exp < TODAY ? " (EXPIRED)" : ""}`} caption="SC I and SC II are the screen cells; 1–11 are the panel. + positive, 0 negative, ? unreadable. Result blank = not tested.">
+      <Callout tone="warning" lead="Bench aid only.">{dt("bench", "Antigrams were transcribed from phone photos. Always verify against the printed antigram for the lot in use and follow your SOP. Click any antigen cell to correct it (+ → 0 → ?); corrections are not saved. Cells marked ? are unreadable in the photo and never used for rule-outs. ⚠ marks handwritten pen marks on the source sheet.")}</Callout>
+        {editedN > 0 && <div style={{ ...bandS("ed"), display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", padding: "6px 12px" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: t.text.primary }}>{`${editedN} antigram cell${editedN === 1 ? "" : "s"} edited from the original lot antigram (purple, marked *)`}</span>
+          <Button label="Restore originals" onClick={() => setEdits({})} />
+        </div>}
+        <div style={{ ...bandS(inclSC ? "ok" : "na"), display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", padding: "6px 12px" }}>
+          <Toggle label="Include screen cells in cross-outs" value={inclSC} onChange={setInclSC} />
+          <span style={{ fontSize: 11, color: t.text.secondary }}>Counts SC I and SC II for rule-outs, antibodies not excluded, units to screen and the confirmation counts. Off by default.</span>
+        </div>
         <div style={{ overflowX: "auto", paddingRight: 8 }}>
           <table style={{ borderCollapse: "collapse", width: "auto", tableLayout: "auto", fontFamily: t.font.family }}>
             <thead><tr>
               <th rowSpan={2} style={{ ...head, textAlign: "left", position: "sticky", left: 0, zIndex: 2, background: t.bg.base }}>Cell</th><th rowSpan={2} style={head}>Rh</th>
               {GROUPS.map((g, gi) => <th key={g.name} colSpan={g.n} style={{ ...head, ...grpBg(gi), ...(g.bold ? shadows(true, true, true, false) : {}) }}>{g.name}</th>)}
-              <th rowSpan={2} style={{ ...head, textAlign: "left" }}>Other</th><th rowSpan={2} style={{ ...head, ...fix(40), fontSize: 10, letterSpacing: -0.2 }}>IS</th><th rowSpan={2} style={{ ...head, ...fix(40), fontSize: 10, letterSpacing: -0.2 }}>37°</th><th rowSpan={2} style={{ ...head, ...fix(50), fontSize: 10, letterSpacing: -0.2 }}>AHG</th><th rowSpan={2} style={{ ...head, whiteSpace: "nowrap", padding: "6px 8px 6px 4px" }}>Cell</th>
+              <th rowSpan={2} style={{ ...head, textAlign: "left" }}>Other</th><th rowSpan={2} style={{ ...head, ...fix(46), fontSize: 10, letterSpacing: -0.2 }}>IS</th><th rowSpan={2} style={{ ...head, ...fix(46), fontSize: 10, letterSpacing: -0.2 }}>37°</th><th rowSpan={2} style={{ ...head, ...fix(54), fontSize: 10, letterSpacing: -0.2 }}>AHG</th><th rowSpan={2} style={{ ...head, whiteSpace: "nowrap", padding: "6px 8px 6px 4px" }}>Cell</th>
             </tr><tr>
               {AG.map((a: string, ai: number) => <th key={a} style={{ ...head, ...agBg(ai), ...bx(ai) }}>{LABEL[a]}</th>)}
             </tr></thead>
@@ -822,12 +918,12 @@ export default function App() {
                 <Fragment key={ci}>
                 {(ci === NS || ci === NP) && <tr><td colSpan={29} style={{ padding: 0, height: 4, background: t.text.secondary }}></td></tr>}
                 <tr style={{ background: rowBg(ci) ?? "transparent" }}>
-                  <td style={{ ...cell, textAlign: "left", whiteSpace: "nowrap", position: "sticky", left: 0, zIndex: 1, background: t.bg.base, backgroundImage: rowBg(ci) ? `linear-gradient(${rowBg(ci)}, ${rowBg(ci)})` : "none" }}>{nm(ci)} <span style={{ color: t.text.tertiary }}>{L.donors[ci]}</span>{ci < NS && !inclSC && <span style={{ color: t.text.warning, fontSize: 10, fontWeight: t.weight.semibold, marginLeft: 4 }}>NOT COUNTED</span>}{ci >= NP && <span style={{ color: t.text.danger, fontSize: 10, fontWeight: t.weight.semibold, marginLeft: 4 }}>EXPIRED {XL.exp}</span>}</td>
+                  <td style={{ ...cell, textAlign: "left", whiteSpace: "nowrap", position: "sticky", left: 0, zIndex: 1, background: t.bg.base, backgroundImage: rowBg(ci) ? `linear-gradient(${rowBg(ci)}, ${rowBg(ci)})` : "none" }}>{nm(ci)} <span style={{ color: t.text.tertiary }}>{L.donors[ci]}</span>{ci >= NP && <span style={{ fontSize: 10, fontWeight: t.weight.semibold, marginLeft: 4, padding: "0 5px", borderRadius: 8, border: `1px solid ${CK.bad.b}`, background: CK.bad.bg, color: t.text.primary }}>EXPIRED {XL.exp}</span>}</td>
                   <td style={cell}>{rh}</td>
                   {AG.map((a: string, ai: number) => {
                     const v = val(ci, ai);
-                    const edited = edits[`${LK(ci)}|${ci}|${ai}`] !== undefined;
-                    return <td key={a} onClick={() => cycle(ci, ai)} style={{ ...cell, cursor: "pointer", fontWeight: v === "+" ? t.weight.semibold : t.weight.regular, color: v === "?" ? t.text.warning : v === "0" ? t.text.tertiary : t.text.primary, textDecoration: edited ? "underline" : "none", ...bx(ai) }}>{v}</td>;
+                    const edited = isEdited(ci, ai);
+                    return <td key={a} onClick={() => cycle(ci, ai)} title={edited ? `Changed from original: ${orig(ci, ai)} → ${v}` : undefined} style={{ ...cell, cursor: "pointer", fontWeight: v === "+" ? t.weight.semibold : t.weight.regular, color: v === "?" ? t.text.warning : v === "0" ? t.text.tertiary : t.text.primary, textDecoration: edited ? "underline" : "none", ...(edited ? { background: CK.ed.bg, outline: `2px solid ${CK.ed.b}`, outlineOffset: -2 } : {}), ...bx(ai) }}>{v}{edited && <span style={{ color: CK.ed.b, fontWeight: 700, fontSize: 10, verticalAlign: "super", marginLeft: 1 }}>*</span>}</td>;
                   })}
                   <td style={{ ...cell, textAlign: "left", color: t.text.secondary }}>{L.other[ci].toLowerCase().includes("pen") ? <span style={{ color: t.text.warning, fontWeight: t.weight.semibold }}>⚠ {L.other[ci]}</span> : L.other[ci]}</td>
                   <td style={ctl}><select style={sel} value={rIS[ci]} onChange={(e) => upd(rIS, setRIS, ci, e.target.value)}>{opts}</select></td>
@@ -851,21 +947,27 @@ export default function App() {
           </table>
         </div>
         <Text>Additional testing on all cells: positive for H, U, Luᵇ, Kpᵇ, Jsᵇ, Vel, Ge, Diᵇ; negative for Vw, Wrᵃ, Diᵃ, except as noted under Other.</Text>
-      </Section>
-      <Section heading="3. Interpretation" caption="Rule-outs, antibodies not excluded, validation rule, and autocontrol / DAT.">
-        {!anyEntered && <Text>Enter results in section 2 to see the interpretation.</Text>}
-        {anyEntered && [acIS, ac37, ac].some(isReactive) && <Callout tone="danger" lead="Autocontrol positive.">Perform a DAT; consider a warm or cold autoantibody, recent transfusion (delayed reaction), or drug-related antibody before relying on rule-outs. Tech Guide section 1: positive indicates possible autoantibody, drug-induced reactivity, or alloantibody on recently transfused donor cells. Perform DAT.</Callout>}
+      </Section></div>
+      <div id="bw-s4"><Section heading="Results" caption="Live from the reactions entered above: alerts, ruled out, remaining and confirmation, patient typing.">
+        {!anyEntered && <Text>Enter reactions in the antigram above to see results.</Text>}
+        {anyEntered && [acIS, ac37, ac].some(isReactive) && <Callout tone="danger" lead="Autocontrol positive.">{dt("ac", "Perform a DAT; consider a warm or cold autoantibody, recent transfusion (delayed reaction), or drug-related antibody before relying on rule-outs. Tech Guide section 1: positive indicates possible autoantibody, drug-induced reactivity, or alloantibody on recently transfused donor cells. Perform DAT.")}</Callout>}
         {anyEntered && ![acIS, ac37, ac].some(isReactive) && [acIS, ac37, ac].some((g: string) => g === "0") && <Text>Autocontrol negative: suggests alloantibody (Tech Guide section 1).</Text>}
-        {anyEntered && example && <Callout tone="info" lead="Example data.">Every Fyᵃ-positive cell graded 2+ at AHG, all others 0. Not a patient result.</Callout>}
-        {anyEntered && schneck && analysis.extraPos.length > 0 && <Callout tone="danger" lead="Unexplained positive reaction(s): account for ALL reactivity.">{`Reactive cell(s) negative for every antibody not ruled out: ${analysis.extraPos.join(", ")}. Tech Guide section 3: ensure 100% of positive reactions are explained; check for additional antibodies (including LFAs), antibodies to high-prevalence antigens, or dosage effects.`}</Callout>}
-        {anyEntered && schneck && <Callout tone="warning" lead="Tech Guide section 3: Account for ALL Reactivity.">Ensure 100% of positive reactions are explained. If extra positives exist, check for additional antibodies (including LFAs), antibodies to high-prevalence antigens, or dosage effects.</Callout>}
+        {anyEntered && example && <Callout tone="info" lead="Example data.">{dt("ex", "Every Fyᵃ-positive cell graded 2+ at AHG, all others 0. Not a patient result.")}</Callout>}
+        {anyEntered && schneck && analysis.extraPos.length > 0 && <Callout tone="danger" lead="Unexplained positive reaction(s): account for ALL reactivity.">{dt("unexp", `Reactive cell(s) negative for every antibody not ruled out: ${analysis.extraPos.join(", ")}. Tech Guide section 3: ensure 100% of positive reactions are explained; check for additional antibodies (including LFAs), antibodies to high-prevalence antigens, or dosage effects.`)}</Callout>}
+        {anyEntered && schneck && <Callout tone="warning" lead="Tech Guide section 3: Account for ALL Reactivity.">{dt("all", "Ensure 100% of positive reactions are explained. If extra positives exist, check for additional antibodies (including LFAs), antibodies to high-prevalence antigens, or dosage effects.")}</Callout>}
         {anyEntered && <Rows rows={[
           { title: "Cells graded", detail: `${analysis.pos.length} reactive, ${analysis.neg.length} nonreactive`, meta: `${analysis.tested} of ${N}${inclSC ? "" : " (screen cells not counted)"}` },
           { title: "Single antibody explaining all reactive cells", detail: matching.length ? matching.map((c) => `anti-${LABEL[c.ag]}`).join(", ") : analysis.pos.length ? "None. Consider multiple antibodies, an antibody to an antigen not on the antigram, dosage, or an autoantibody." : "No reactive cells entered.", status: { label: matching.length ? "Pattern match" : analysis.pos.length ? "Not explained" : "Negative", tone: matching.length ? "success" : analysis.pos.length ? "warning" : undefined } },
         ]} />}
         {anyEntered && matching.length > 1 && <Text>More than one candidate fits the pattern; test selected cells to separate them.</Text>}
+        {anyEntered && analysis.ruled.length > 0 && (
+          <div style={bandS("ok")}><Section heading="Ruled out">
+            <Table columns={["Antibody", `Ruled out on nonreactive cell(s)`]} rows={analysis.ruled.map((r) => [`anti-${LABEL[r.ag]}`, r.cells.join(", ")])} />
+            <Text>{schneck ? `Schneck Tech Guide (11/2026), only one needed: 1 nonreactive double-dose (homozygous) cell for C, c, E, e, Fyᵃ, Fyᵇ, Jkᵃ, Jkᵇ, M, N, S, s (and k: K−k+); 1 nonreactive antigen-positive cell for D, K, P₁, Xgᵃ, Leᵃ, Leᵇ, Luᵃ, Cʷ, Kpᵃ; with Anti-D detected on, 1 nonreactive D− C+c+ / D− E+e+ cell for C / E.${inclSC ? "" : " Screen cells are not counted."}` : het ? "Heterozygous cells are being used for rule-outs (toggle on)." : "Rh (C, c, E, e), Kidd, Duffy and MNS antigens are ruled out only on homozygous cells; all others on any antigen-positive nonreactive cell."}</Text>
+          </Section></div>
+        )}
         {anyEntered && analysis.cands.length > 0 && (
-          <Section heading={schneck ? `3a. Not excluded (candidates) and Schneck ${vRule} confirmation` : "3a. Not excluded (candidates) and rule of three"}>
+          <div style={bandS("warn")}><Section heading={schneck ? `Remaining (not excluded) and Schneck ${vRule} confirmation` : "Remaining (not excluded) and rule of three"}>
             <Table columns={schneck ? ["Antibody", "Explains reactive cells", "Ag+ reactive", "Ag− nonreactive", `Schneck: ${vRule}`, "Nonreactive Ag+ cells"] : ["Antibody", "Explains reactive cells", "Ag+ reactive", "Ag− nonreactive", "3+/3− (p ≤ 0.05)"]}
               rows={analysis.cands.map((c) => [
                 c.lfa ? <span>{`anti-${LABEL[c.ag]}${negTxt(c.ag)} `}<span style={{ fontStyle: "italic", color: t.text.tertiary }}>Low-frequency: may be omitted initially</span></span> : `anti-${LABEL[c.ag]}${negTxt(c.ag)}`,
@@ -875,19 +977,13 @@ export default function App() {
                 ...(schneck ? [c.single ? `single dose OK: ${c.homo} of 1` : `double dose ${c.homo} of 1${antiD && (c.ag === "C" || c.ag === "E") ? ` / D− ${c.ag === "C" ? "C+c+" : "E+e+"} ${c.dNeg} of 1` : ""} (${c.hetN} single-dose, not accepted)`] : []),
               ])} />
             <Text>Candidates with no matching pattern still need rule-out with selected cells if clinically significant.</Text>
-          </Section>
+          </Section></div>
         )}
-        {anyEntered && analysis.ruled.length > 0 && (
-          <Section heading="3b. Rule-out">
-            <Table columns={["Antibody", `Ruled out on nonreactive cell(s)`]} rows={analysis.ruled.map((r) => [`anti-${LABEL[r.ag]}`, r.cells.join(", ")])} />
-            <Text>{schneck ? `Schneck Tech Guide (11/2026), only one needed: 1 nonreactive double-dose (homozygous) cell for C, c, E, e, Fyᵃ, Fyᵇ, Jkᵃ, Jkᵇ, M, N, S, s (and k: K−k+); 1 nonreactive antigen-positive cell for D, K, P₁, Xgᵃ, Leᵃ, Leᵇ, Luᵃ, Cʷ, Kpᵃ; with Anti-D detected on, 1 nonreactive D− C+c+ / D− E+e+ cell for C / E.${inclSC ? "" : " Screen cells are not counted."}` : het ? "Heterozygous cells are being used for rule-outs (toggle on)." : "Rh (C, c, E, e), Kidd, Duffy and MNS antigens are ruled out only on homozygous cells; all others on any antigen-positive nonreactive cell."}</Text>
-          </Section>
-        )}
-        {anyEntered && schneck && <Section heading="3c. Patient antigen typing (Tech Guide section 4)">
-          {(txRecent || datPos) ? <Callout tone="danger" lead="STOP: do NOT perform routine serologic phenotyping.">{`${txRecent ? "The patient was transfused in the last 3 months (risk of mixed-field reactions). " : ""}${datPos ? "The patient has a positive IgG DAT (risk of false-positive reactions at the IAT phase). " : ""}Action: in these cases, utilize molecular RBC genotyping or historical pre-transfusion records.`}</Callout> : <Text>{`Requirement: patient must type antigen-negative for the suspected corresponding antibody${matching.length ? ` (${matching.map((c) => `${LABEL[c.ag]}−`).join(", ")})` : ""}. STOP, do not perform routine serologic phenotyping if the patient was transfused in the last 3 months or has a positive IgG DAT (mark these in section 1); use molecular RBC genotyping or historical pre-transfusion records instead.`}</Text>}
-        </Section>}
-      </Section>
-      <Section heading="4. Antigen-negative units (units to screen)" caption="Uses this Page's antigen-negative frequencies. Assumes antigens are inherited independently.">
+        {anyEntered && schneck && <div style={bandS(histOn ? "bad" : "na")}><Section heading="Patient antigen typing (Tech Guide section 4)">
+          {(txRecent || datPos) ? <Callout tone="danger" lead="STOP: do NOT perform routine serologic phenotyping.">{dt("stop", `${txRecent ? "The patient was transfused in the last 3 months (risk of mixed-field reactions). " : ""}${datPos ? "The patient has a positive IgG DAT (risk of false-positive reactions at the IAT phase). " : ""}Action: in these cases, utilize molecular RBC genotyping or historical pre-transfusion records.`)}</Callout> : <Text>{`Requirement: patient must type antigen-negative for the suspected corresponding antibody${matching.length ? ` (${matching.map((c) => `${LABEL[c.ag]}−`).join(", ")})` : ""}. STOP, do not perform routine serologic phenotyping if the patient was transfused in the last 3 months or has a positive IgG DAT (mark these in section 1); use molecular RBC genotyping or historical pre-transfusion records instead.`}</Text>}
+        </Section></div>}
+      </Section></div>
+      <div id="bw-s6"><Section heading="Units to screen (antigen-negative units)" caption="Uses this Page's antigen-negative frequencies. Assumes antigens are inherited independently.">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           <Button label="Donor unknown" variant={pop === "u" ? "primary" : undefined} onClick={() => setPop("u")} />
           <Button label="White donors" variant={pop === "w" ? "primary" : undefined} onClick={() => setPop("w")} />
@@ -913,8 +1009,8 @@ export default function App() {
         {pop === "u" && <Text>Worst-case estimate (donor ethnicity unknown): each antigen uses the lower of the White and Black antigen-negative values, so a mixed donor pool will usually need fewer units.</Text>}
         {schneck && calcAuto && <Text>Schneck rules: low-frequency antibodies (V, Cʷ, Kpᵃ, Jsᵃ, Luᵃ) not yet ruled out are left out of the live selection; tap a chip to add one.</Text>}
         <Text>{`Antigens without a verified frequency for the chosen population (Cʷ, Xgᵃ, and Black values not on this Page) are not offered.${rhCount > 1 ? " Rh antigens are inherited together as haplotypes (e.g. C with e, c with E), so this product is only approximate for Rh combinations; check Rh phenotype frequencies in section 5." : ""} Approximation only; follow your SOP.`}</Text>
-      </Section>
-      <Section heading="5. Reference" caption="Antigen frequencies, clinical significance, phenotypes, antibody frequencies, Bio-Rad and dosage references, Schneck helpful hints (superseded), then the guides and charts at the end: Schneck Tech Guide (11/2026), compatibility chart, component selection, cryo & plasma compatibility, Ortho Antibody Index Chart and Grifols antigens & antibodies poster. Tap a heading to expand.">
+      </Section></div>
+      <Section key={pr ? "pref" : "sref"} collapsible defaultOpen={pr} heading="5. Reference (5.1–5.14)" caption="Antigen frequencies, clinical significance, phenotypes, antibody frequencies, Bio-Rad and dosage references, Schneck helpful hints (superseded), then the guides and charts at the end: Schneck Tech Guide (11/2026), compatibility chart, component selection, cryo & plasma compatibility, Ortho Antibody Index Chart and Grifols antigens & antibodies poster. Tap a heading to expand.">
       <Section key={pr ? "p51" : "s51"} heading="5.1 Antigen frequencies" collapsible defaultOpen={pr}>
         <Callout tone="info" lead="Population estimates.">Frequencies are rounded population estimates from published references; verify against your lab's reference. Cw is omitted (could not verify). Xga is X-linked: F = females, M = males (Northern European data); no verified Black value. Lewis values are for adults. Verify against your facility's SOP and reference before selecting units.</Callout>
         <Text>Highlighted rows: antibodies to these antigens are clinically significant, so give antigen-negative units.</Text>
@@ -1183,6 +1279,7 @@ export default function App() {
         {GRIF_REFS.map((f: string) => <Text key={f}>{f}</Text>)}
       </Section>
       </Section>
+      <div style={{ borderTop: `1px solid ${t.border.subtle}`, paddingTop: 6, fontSize: 11, color: t.text.tertiary, textAlign: "right" }}>Last updated by Alexis Tobias · Nov 21, 2026, 9:47 PM ET</div>
     </Page>
   );
 }

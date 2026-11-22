@@ -55,7 +55,9 @@ for (const [fixtureRel, appRel, label] of PAIRS) {
   for (const heading of ["5.9 ", "5.10 ", "5.11 ", "5.12 ", "5.13 ", "5.14 "]) {
     if (!fixture.includes(heading)) throw new Error(`${label} source is missing heading ${heading}`);
   }
-  if (!fixture.includes("NOT COUNTED")) throw new Error(`${label} source is missing NOT COUNTED`);
+  if (label === "AntibodyID Pro" && !fixture.includes("NOT COUNTED")) throw new Error(`${label} source is missing NOT COUNTED`);
+  if (label === "Bells and Whistles" && !fixture.includes("Screen cells NOT counted")) throw new Error(`${label} source is missing the screen-cells chip`);
+  if (label === "Bells and Whistles" && !fixture.includes("Last updated by Alexis Tobias · Nov 21, 2026, 9:47 PM ET")) throw new Error(`${label} source is missing the footer`);
   if (!fixture.includes("Bench aid only.")) throw new Error(`${label} source is missing the bench-aid warning`);
   if (!fixture.includes("not verified")) throw new Error(`${label} source is missing "not verified" marks`);
 
@@ -99,9 +101,9 @@ for (const [fixtureRel, appRel, label] of PAIRS) {
     bioradAntibodies: 59,
     dosageRows: 14,
     schneckHints: 7,
-    panelLots: 6,
-    screenLots: 29,
-    antigramRows: 124,
+    panelLots: 7,
+    screenLots: 30,
+    antigramRows: 137,
     antigens: 22,
     schneckDouble: "C,c,E,e,Fya,Fyb,Jka,Jkb,M,N,S,s",
     schneckSingle: "D,K,P1,Xga,Lea,Leb,Lua,Lub",
@@ -113,6 +115,15 @@ for (const [fixtureRel, appRel, label] of PAIRS) {
   };
   for (const [key, value] of Object.entries(expected)) {
     if (counts[key] !== value) throw new Error(`${label} ${key}: got ${counts[key]}, expected ${value}`);
+  }
+  if (fromFixture.LOTS[0].lot !== "6100 26023" || fromFixture.LOTS[0].exp !== "2026-12-19") {
+    throw new Error(`${label} default panel lot is ${fromFixture.LOTS[0].lot} ${fromFixture.LOTS[0].exp}`);
+  }
+  if (fromFixture.SCREENS[0].lot !== "6435 26023" || fromFixture.SCREENS[0].exp !== "2026-12-19") {
+    throw new Error(`${label} default screen lot is ${fromFixture.SCREENS[0].lot} ${fromFixture.SCREENS[0].exp}`);
+  }
+  if (!fixture.includes("localISO") || !fixture.includes("exp < TODAY")) {
+    throw new Error(`${label} source is missing runtime expiry`);
   }
   for (const lot of [...fromFixture.LOTS, ...fromFixture.SCREENS]) {
     const n = lot.cells.length;

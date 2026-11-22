@@ -13,6 +13,8 @@ const SCH_N = 1; // "Only one needed"
 
 interface Lot { lot: string; exp: string; donors: string[]; rh: string[]; cells: string[]; other: string[]; brand?: string; product?: string; }
 const LOTS: Lot[] = [
+  { lot:"6100 26023", exp:"2026-12-19", donors:["M9259AM","M8229HM","M9398LS","M8268AM","M6061AM","M8581AM","M8155LS","M8964AM","M9260LS","M5049AM","M0460CC"], rh:["rr","rr","r'r","r''r","rr","R0r","R1R1","R1R1","R1wR1","R2R2","R1r"],
+    cells:["0001100101001101001101","0001101100101100110101","0101100100111111110101","0011100100101111101000","0001100100110010110001","1001100100010111100001","1100100110110111010001","1100101100101010110110","1100110101010010101101","1011000101111011110101","1101101101101111000111"], other:["","Co(b+)","","","","","","Lu(b-)","","","Co(b+), Wr(a+)"] },
   { lot:"6100 26021", exp:"2026-11-21", donors:["M4438CC","M8269AM","M8566AM","M9111LS","M7331CC","M8991AM","M8271AM","M8867AM","M9161AM","M7998AM","M6631CC"], rh:["rr","rr","r'r","r''r","rr","R0r","R1R1","R1R1","R1wR1","R2R2","rr"],
     cells:["0001100111110110101010","0001101100101010100001","0101100100101010100001","0011100101111101010101","0001100101010011101101","1001100100010010001101","1100100100101110110001","1100101101111101001101","1100110101010110101100","1011000101001010110000","0001100101101010101111"], other:["","","","Co(b+)","Co(b+)","U(-)","","","","",""] },
   { lot:"6100 26019", exp:"2026-10-24", donors:["M9004CC","M8429LS","M8967LS","M8118LS","M5530CC","M8956HM","M9073AM","M4266AM","M5757AM","M8135AM","M0460CC"], rh:["rr","rr","r'r","r''r","rr","R0r","R1R1","R1R1","R1wR1","R2R2","R1r"],
@@ -27,6 +29,7 @@ const LOTS: Lot[] = [
     cells:["0001100101001101001100","0001101001011101110101","0101100101110100100101","0011100100101010101101","0001100110110101101001","1001100100010110101100","1100100100101011010001","1100101100101111101100","1100110101111110101101","1011000100111010101110","1111000101011100101101"], other:["","","P1 printed +w","","","Js(a+)","","P1 printed +vw","","Lu(b-)","C printed +w"] },
 ];
 const SCREENS: Lot[] = [
+{lot:"6435 26023",exp:"2026-12-19",donors:["M9393CC","M4870HO"],rh:["R1R1","R2R2"],cells:["1100100100101110101000","1011001101010101010101"],other:["Co(b+)",""]},
 {lot:"6435 26021",exp:"2026-11-21",donors:["M8169HM","M9291AM"],rh:["R1R1","R2R2"],cells:["1100100100110101010101","1011001101001110101001"],other:["Co(b+)",""]},
 {lot:"6435 26017",exp:"2026-09-26",donors:["M8169HM","M7374LS"],rh:["R1R1","R2R2"],cells:["1100100100110101010101","1011001101001111101011"],other:["Co(b+)",""]},
 {lot:"6435 26015",exp:"2026-08-29",donors:["M8169HM","M7374LS"],rh:["R1R1","R2R2"],cells:["1100100100110101010101","1011001101001111101011"],other:["Co(b+)",""]},
@@ -57,11 +60,15 @@ const SCREENS: Lot[] = [
 {lot:"6435 24015",exp:"2024-08-31",donors:["M5589AM","M7806AM"],rh:["R1R1","R2R2"],cells:["1100101100101110110101","1011000101010101001101"],other:["P1 printed +vw","P1 printed +w"]},
 {lot:"6435 24007",exp:"2024-05-11",donors:["M5589AM","M7175AM"],rh:["R1R1","R2R2"],cells:["1100101100101110110101","1011001101010011001101"],other:["P1 printed +vw",""]}
 ];
-const TODAY = "2026-10-31";
+// Expiry is checked against the viewer's current local calendar date (YYYY-MM-DD). A lot is expired only after its expiration date: exp < TODAY.
+const localISO = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const TODAY: string = localISO(new Date());
 // Brand/product per lot; add another manufacturer's lots with their own brand and product.
 const B_SCREENS: Lot[] = SCREENS.map((l: Lot) => ({ ...l, brand: "Grifols", product: "Search-Cyte Plus 0.8%" }));
 const B_LOTS: Lot[] = LOTS.map((l: Lot) => ({ ...l, brand: "Grifols", product: "Data-Cyte Plus" }));
 const BRANDS: string[] = Array.from(new Set([...B_SCREENS, ...B_LOTS].map((l: Lot) => l.brand as string)));
+// Default lot: the first (newest) non-expired lot of the default manufacturer; falls back to the first lot if all are expired.
+const firstCurrent = (src: Lot[]): string => { const i = src.findIndex((l: Lot) => l.brand === BRANDS[0] && l.exp >= TODAY); return String(i >= 0 ? i : 0); };
 const GRADES = ["", "0", "w", "1+", "2+", "3+", "4+", "nt"];
 const GROUPS: { name: string; n: number; bold?: boolean }[] = [{ name: "Rh", n: 6 }, { name: "Kell", n: 3 }, { name: "Duffy", n: 2, bold: true }, { name: "Kidd", n: 2 }, { name: "MNS", n: 4, bold: true }, { name: "Lewis", n: 2 }, { name: "P1PK", n: 1 }, { name: "Luth.", n: 1 }, { name: "Xg", n: 1, bold: true }];
 const YEL = "rgba(255, 228, 77, 0.38)";
@@ -583,8 +590,8 @@ const num = (s: string | null): number | null => { if (s === null) return null; 
 
 export default function App() {
   const t = useGrokTheme();
-  const [pLot, setPLot] = useState<string>("0");
-  const [sLot, setSLot] = useState<string>("0");
+  const [pLot, setPLot] = useState<string>(firstCurrent(B_LOTS));
+  const [sLot, setSLot] = useState<string>(firstCurrent(B_SCREENS));
   const [calcSel, setCalcSel] = useState<string[]>([]);
   const [calcAuto, setCalcAuto] = useState<boolean>(true);
   const [xOn, setXOn] = useState<boolean>(false);
